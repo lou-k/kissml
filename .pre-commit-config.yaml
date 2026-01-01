@@ -3,15 +3,15 @@ repos:
     rev: v0.12.12
     hooks:
       - id: ruff-check
-        args: [kissml/, --fix]
+        args: [kissml/, tests/, --fix]
       - id: ruff-format
-        args: [kissml/]
+        args: [kissml/, tests/]
 
   - repo: https://github.com/pycqa/isort
     rev: 6.0.1
     hooks:
       - id: isort
-        args: [kissml/]
+        args: [kissml/, tests/]
 
   - repo: local
     hooks:

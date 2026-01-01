@@ -11,6 +11,9 @@ from .types import CacheConfig
 P = ParamSpec("P")
 R = TypeVar("R")
 
+# Sentinel value to distinguish "not in cache" from "cached None"
+_CACHE_MISS = object()
+
 
 def step(
     log_level: Optional[int] = None, cache: Optional[CacheConfig] = None
@@ -103,8 +106,11 @@ def step(
                 cache_key = (cache.version, arg_hash)
 
                 # Check if result is cached
-                cached_result = cache_instance.get(cache_key, default=None)
-                if cached_result is not None:
+                # Use sentinel to distinguish "not in cache" from "cached None"
+                cached_result = cache_instance.get(
+                    cache_key, default=_CACHE_MISS
+                )
+                if cached_result is not _CACHE_MISS:
                     execution_time = time.time() - start_time
                     if log_level is not None:
                         logging.log(
