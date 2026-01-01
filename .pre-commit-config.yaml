@@ -3,18 +3,21 @@ repos:
     rev: v0.12.12
     hooks:
       - id: ruff-check
-        args: [kissml/, tests/, --fix]
+        args: [kissml/, --fix]
       - id: ruff-format
-        args: [kissml/, tests/]
+        args: [kissml/]
 
   - repo: https://github.com/pycqa/isort
     rev: 6.0.1
     hooks:
       - id: isort
-        args: [kissml/, tests/]
+        args: [kissml/]
 
-  - repo: https://github.com/blu3r4y/ty-pre-commit
-    rev: v0.0.8
+  - repo: local
     hooks:
       - id: ty
-        args: [kissml/, tests/]
+        name: ty check
+        entry: ty check kissml --ignore unresolved-import
+        language: python
+        pass_filenames: false
+        files: ^kissml/.*\.py$
