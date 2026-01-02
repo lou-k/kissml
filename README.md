@@ -21,8 +21,7 @@ The `@step` decorator provides execution tracking and persistent disk-based cach
 ### Basic Usage
 
 ```python
-from kissml.step import step
-from kissml.types import CacheConfig
+from kissml import step, CacheConfig
 import logging
 
 # Simple execution time logging
@@ -100,7 +99,7 @@ def complex_pipeline(data) -> dict:
 Control cache behavior with `CacheConfig`:
 
 ```python
-from kissml.types import CacheConfig, EvictionPolicy
+from kissml import step, CacheConfig, EvictionPolicy
 
 # No eviction (default) - cache grows forever
 @step(cache=CacheConfig(version=1, eviction_policy=EvictionPolicy.NONE))
@@ -128,7 +127,7 @@ def lfu_cache(x):
 Configure the cache directory via environment variable or settings:
 
 ```python
-from kissml.settings import settings
+from kissml import settings
 from pathlib import Path
 
 # Set cache directory
@@ -143,8 +142,7 @@ settings.cache_directory = Path("/path/to/cache")
 Register custom serializers for your types:
 
 ```python
-from kissml.settings import settings
-from kissml.types import Serializer
+from kissml import settings, Serializer
 from typing import Any, BinaryIO
 
 class MyCustomSerializer(Serializer):

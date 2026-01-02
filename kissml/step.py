@@ -48,23 +48,25 @@ def step(
         - Cache is isolated per function name and eviction policy
         - Bumping the version number invalidates old cached results
 
-    Example:
+    Examples:
         Basic timing without caching:
 
+        >>> from kissml import step
+        >>> import logging
         >>> @step(log_level=logging.INFO)
-        >>> def compute(x, y):
+        ... def compute(x, y):
         ...     return x + y
         >>> compute(1, 2)
         # Logs: "compute completed in 0.0001 seconds"
 
         With caching enabled:
 
-        >>> from kissml.types import CacheConfig, EvictionPolicy
+        >>> from kissml import step, CacheConfig, EvictionPolicy
         >>> @step(
         ...     log_level=logging.INFO,
         ...     cache=CacheConfig(version=1, eviction_policy=EvictionPolicy.NONE)
         ... )
-        >>> def expensive_computation(data):
+        ... def expensive_computation(data):
         ...     return process(data)
         >>> expensive_computation(my_data)
         # First call logs: "expensive_computation completed in 5.2341 seconds"
@@ -73,8 +75,9 @@ def step(
 
         Version-based cache invalidation:
 
+        >>> from kissml import step, CacheConfig
         >>> @step(cache=CacheConfig(version=2))  # Bumped from version=1
-        >>> def updated_function(x):
+        ... def updated_function(x):
         ...     return new_logic(x)
         # Cache miss - version 2 doesn't match version 1 cache
     """
