@@ -17,10 +17,6 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/kissml
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
