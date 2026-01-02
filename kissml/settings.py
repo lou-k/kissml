@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,9 +11,6 @@ from kissml.serializers import (
     TupleSerializer,
 )
 from kissml.types import Serializer
-
-if TYPE_CHECKING:
-    pass
 
 
 def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
