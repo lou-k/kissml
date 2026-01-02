@@ -6,6 +6,10 @@ authors = [{ name="Lou Kratz", email="kissml@lou.dev" }]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "diskcache>=5.6.3",
+    "pandas>=2.3.3",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.0.0",
 ]
 license = "APACHE-2.0"
 license-files = ["LICEN[CS]E*"]
@@ -17,9 +21,14 @@ Homepage = "https://github.com/lou-k/kissml"
 dev = [
     "coverage>=7.0.0",
     "ipython>=8.37.0",
+    "isort>=7.0.0",
+    "pandas>=2.3.3",
+    "pandas-stubs>=2.3.3.251219",
     "pkginfo>=1.12.1.2",
     "pre-commit>=3.6.0",
+    "pyarrow>=22.0.0",
     "pytest>=8.4.1",
+    "pytest-cov>=7.0.0",
     "ruff>=0.1.0",
     "ty>=0.0.8",
 ]
@@ -101,7 +110,13 @@ filterwarnings = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "network: marks tests as requiring network access",
-    "asyncio: marks tests as async tests using asyncio",
 ]
-# Configure pytest-asyncio to automatically detect async tests
-asyncio_mode = "auto"
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+build_command = "uv build"
+major_on_zero = false
+allow_zero_version = true
+
+[tool.semantic_release.changelog]
+changelog_file = "CHANGELOG.md"

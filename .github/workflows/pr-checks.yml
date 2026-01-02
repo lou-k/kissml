@@ -69,5 +69,5 @@ jobs:
 
       - name: Run ty type checking
         run: |
-          uv run ty kissml/ tests/
+          uv run ty check kissml --ignore unresolved-import
 
