@@ -111,3 +111,12 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "network: marks tests as requiring network access",
 ]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+build_command = "uv build"
+major_on_zero = false
+allow_zero_version = true
+
+[tool.semantic_release.changelog]
+changelog_file = "CHANGELOG.md"
