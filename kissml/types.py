@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from pydantic import BaseModel, Field
 
@@ -47,23 +46,23 @@ class Serializer(ABC):
     """
 
     @abstractmethod
-    def serialize(self, value: Any, path: Path) -> None:
+    def serialize(self, value: Any, out: BinaryIO) -> None:
         """
-        Write value to disk at the given path.
+        Write value to output stream at the given position.
 
         Args:
             value: The object to serialize
-            path: Full path including filename and extension
+            out: The file like object to write to
         """
         pass
 
     @abstractmethod
-    def deserialize(self, path: Path) -> Any:
+    def deserialize(self, input: BinaryIO) -> Any:
         """
-        Read value from disk at the given path.
+        Read value from the bytestream at the given path.
 
         Args:
-            path: Full path to the serialized file
+            input: The file or byte stream to read from
 
         Returns:
             The deserialized object

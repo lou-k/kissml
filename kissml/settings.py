@@ -4,7 +4,12 @@ from typing import TYPE_CHECKING, Any, Callable
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from kissml.serializers import PandasSerializer
+from kissml.serializers import (
+    DictSerializer,
+    ListSerializer,
+    PandasSerializer,
+    TupleSerializer,
+)
 from kissml.types import Serializer
 
 if TYPE_CHECKING:
@@ -25,7 +30,11 @@ def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
 
 
 def _default_serializer_by_type() -> dict[type, Serializer]:
-    rv: dict[type, Serializer] = {}
+    rv: dict[type, Serializer] = {
+        list: ListSerializer(),
+        tuple: TupleSerializer(),
+        dict: DictSerializer(),
+    }
     try:
         import pandas as pd
 
