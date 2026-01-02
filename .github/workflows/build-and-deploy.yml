@@ -41,25 +41,20 @@ jobs:
         with:
           version: "latest"
 
+      - name: Cache Docker images
+        uses: ScribeMD/docker-cache@0.5.0
+        with:
+          key: docker-${{ runner.os }}-semantic-release
+
       - name: Python Semantic Release
-        id: release
         uses: python-semantic-release/python-semantic-release@v9.14.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_committer_name: "github-actions[bot]"
           git_committer_email: "github-actions[bot]@users.noreply.github.com"
 
-      - name: Publish release to GitHub
-        if: steps.release.outputs.released == 'true'
-        uses: python-semantic-release/publish-action@v9.14.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.release.outputs.tag }}
-
       - name: Build package
-        if: steps.release.outputs.released == 'true'
         run: uv build
 
       - name: Publish to PyPI
-        if: steps.release.outputs.released == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
