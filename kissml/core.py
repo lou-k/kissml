@@ -3,6 +3,7 @@ from typing import Any, Tuple
 
 from diskcache import Cache
 
+from kissml.disk import TypeRoutingDisk
 from kissml.settings import settings
 from kissml.types import EvictionPolicy
 
@@ -52,10 +53,10 @@ def get_cache(function_name: str, eviction_policy: EvictionPolicy) -> Cache:
         cache_directory = (
             settings.cache_directory / function_name / eviction_policy.value
         )
-        # TODO: add custom disk to handle serialization of large data types
         _caches[key] = Cache(
             directory=str(cache_directory),
             eviction_policy=eviction_policy.value,
+            disk=TypeRoutingDisk,
         )
 
     return _caches[key]

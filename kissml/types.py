@@ -1,4 +1,7 @@
+from abc import ABC, abstractmethod
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -33,3 +36,36 @@ class CacheConfig(BaseModel):
         default=0,
         description="The cache version. Change this to invalidate all entries on a re-run.",
     )
+
+
+class Serializer(ABC):
+    """
+    Abstract base class for type-specific serializers.
+
+    Serializers define how to convert Python objects to/from disk storage.
+    Each serializer handles one type.
+    """
+
+    @abstractmethod
+    def serialize(self, value: Any, path: Path) -> None:
+        """
+        Write value to disk at the given path.
+
+        Args:
+            value: The object to serialize
+            path: Full path including filename and extension
+        """
+        pass
+
+    @abstractmethod
+    def deserialize(self, path: Path) -> Any:
+        """
+        Read value from disk at the given path.
+
+        Args:
+            path: Full path to the serialized file
+
+        Returns:
+            The deserialized object
+        """
+        pass
