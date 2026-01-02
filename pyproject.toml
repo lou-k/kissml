@@ -11,7 +11,7 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-settings>=2.0.0",
 ]
-license = "APACHE-2.0"
+license = "CC-BY-NC-ND-4.0"
 license-files = ["LICEN[CS]E*"]
 
 [project.urls]
@@ -114,7 +114,6 @@ markers = [
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-build_command = "uv build"
 major_on_zero = false
 allow_zero_version = true
 

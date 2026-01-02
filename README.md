@@ -142,7 +142,8 @@ settings.cache_directory = Path("/path/to/cache")
 Register custom serializers for your types:
 
 ```python
-from kissml import settings, Serializer
+from kissml.settings import settings
+from kissml.types import Serializer
 from typing import Any, BinaryIO
 
 class MyCustomSerializer(Serializer):
@@ -163,4 +164,6 @@ settings.hash_by_type[MyCustomType] = lambda obj: str(hash(obj))
 
 ## License
 
-Licensed under the Apache License 2.0. See LICENSE file for details.
+Licensed under CC BY-NC-ND 4.0 (Attribution-NonCommercial-NoDerivatives). This is a **non-commercial license** - see the [LICENSE](LICENSE) file for full details.
+
+For commercial use, please contact the author.
