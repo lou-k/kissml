@@ -128,3 +128,105 @@ def test_mixed_dataframe_and_primitives():
     result5 = transform_dataframe(df2, multiplier=2, offset=10.0)
     assert call_count == 4
     assert result5["transformed"].tolist() == [30.0, 50.0, 70.0]
+
+
+def test_tuple_with_dataframes():
+    """Test that tuples containing DataFrames serialize elements separately."""
+    call_count = 0
+
+    @step(cache=CacheConfig(version=0))
+    def return_tuple(rows: int) -> tuple:
+        nonlocal call_count
+        call_count += 1
+        df1 = pd.DataFrame({"a": range(rows)})
+        df2 = pd.DataFrame({"b": range(rows, rows * 2)})
+        return (df1, rows, df2, "metadata")
+
+    # First call - cache miss
+    result1 = return_tuple(3)
+    assert call_count == 1
+    assert len(result1) == 4
+    assert isinstance(result1[0], pd.DataFrame)
+    assert result1[1] == 3
+    assert isinstance(result1[2], pd.DataFrame)
+    assert result1[3] == "metadata"
+
+    # Second call - cache hit
+    result2 = return_tuple(3)
+    assert call_count == 1  # Cache hit
+
+    # Verify tuple elements match
+    pd.testing.assert_frame_equal(result1[0], result2[0])
+    assert result1[1] == result2[1]
+    pd.testing.assert_frame_equal(result1[2], result2[2])
+    assert result1[3] == result2[3]
+
+
+def test_list_with_dataframes():
+    """Test that lists containing DataFrames serialize elements separately."""
+    call_count = 0
+
+    @step(cache=CacheConfig(version=0))
+    def return_list(rows: int) -> list:
+        nonlocal call_count
+        call_count += 1
+        df1 = pd.DataFrame({"a": range(rows)})
+        df2 = pd.DataFrame({"b": range(rows, rows * 2)})
+        return [df1, df2]
+
+    # First call - cache miss
+    result1 = return_list(3)
+    assert call_count == 1
+    assert len(result1) == 2
+    assert isinstance(result1[0], pd.DataFrame)
+    assert isinstance(result1[1], pd.DataFrame)
+
+    # Second call - cache hit
+    result2 = return_list(3)
+    assert call_count == 1  # Cache hit
+
+    # Verify list elements match
+    pd.testing.assert_frame_equal(result1[0], result2[0])
+    pd.testing.assert_frame_equal(result1[1], result2[1])
+
+    # Different rows - cache miss
+    result3 = return_list(5)
+    assert call_count == 2
+    assert len(result3[0]) == 5
+    assert len(result3[1]) == 5
+
+
+def test_dict_with_dataframes():
+    """Test that dicts containing DataFrames serialize key-value pairs separately."""
+    call_count = 0
+
+    @step(cache=CacheConfig(version=0))
+    def return_dict(rows: int) -> dict:
+        nonlocal call_count
+        call_count += 1
+        df1 = pd.DataFrame({"a": range(rows)})
+        df2 = pd.DataFrame({"b": range(rows, rows * 2)})
+        return {"first": df1, "second": df2, "count": rows}
+
+    # First call - cache miss
+    result1 = return_dict(3)
+    assert call_count == 1
+    assert len(result1) == 3
+    assert isinstance(result1["first"], pd.DataFrame)
+    assert isinstance(result1["second"], pd.DataFrame)
+    assert result1["count"] == 3
+
+    # Second call - cache hit
+    result2 = return_dict(3)
+    assert call_count == 1  # Cache hit
+
+    # Verify dict values match
+    pd.testing.assert_frame_equal(result1["first"], result2["first"])
+    pd.testing.assert_frame_equal(result1["second"], result2["second"])
+    assert result1["count"] == result2["count"]
+
+    # Different rows - cache miss
+    result3 = return_dict(5)
+    assert call_count == 2
+    assert len(result3["first"]) == 5
+    assert result3["count"] == 5
