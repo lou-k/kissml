@@ -242,9 +242,31 @@ def test_new_feature():
    ```
 
 4. **Commit your changes**
+
+   **IMPORTANT**: This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automatic semantic versioning. Your commit messages **must** follow this format:
+
+   ```
+   <type>: <description>
+
+   [optional body]
+   ```
+
+   **Commit types**:
+   - `fix:` - Bug fixes (triggers patch version bump: 0.0.x)
+   - `feat:` - New features (triggers minor version bump: 0.x.0)
+   - `feat!:` or `BREAKING CHANGE:` - Breaking changes (triggers major version bump: x.0.0)
+   - `docs:` - Documentation only changes (no version bump)
+   - `chore:` - Maintenance tasks (no version bump)
+   - `ci:` - CI/CD changes (no version bump)
+   - `test:` - Adding or updating tests (no version bump)
+   - `refactor:` - Code refactoring (no version bump)
+
+   **Examples**:
    ```bash
-   git add .
-   git commit -m "Add feature: brief description"
+   git commit -m "feat: add numpy array serializer"
+   git commit -m "fix: handle edge case in cache key generation"
+   git commit -m "docs: update README with pandas examples"
+   git commit -m "feat!: change step decorator API for better type safety"
    ```
 
    Pre-commit hooks will run automatically. Fix any issues before proceeding.
