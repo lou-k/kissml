@@ -3,10 +3,10 @@ import logging
 import time
 from functools import wraps
 from types import FunctionType
-from typing import Callable, Optional, ParamSpec, TypeVar, cast
+from typing import Callable, Optional, ParamSpec, TypeVar, cast, get_type_hints
 
 from .core import create_cache_key, get_cache
-from .types import CacheConfig
+from .types import AfterEffect, CacheConfig
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -16,14 +16,17 @@ _CACHE_MISS = object()
 
 
 def step(
-    log_level: Optional[int] = None, cache: Optional[CacheConfig] = None
+    log_level: Optional[int] = None,
+    cache: Optional[CacheConfig] = None,
+    error_on_affect_failure: bool = False,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
-    Decorator to track execution time and optionally cache function results.
+    Decorator for machine learning pipeline steps.
 
-    This decorator provides two main features:
+    This decorator provides the following features:
     1. Execution time tracking with configurable logging
     2. Persistent disk-based caching with version control
+    3. Executes any AfterEffects declared in the function's return type annotation
 
     The decorator normalizes function arguments (positional and keyword) to ensure
     consistent cache keys regardless of how the function is called.
@@ -36,6 +39,8 @@ def step(
             If provided, results are cached to disk based on function arguments.
             Cache keys include the version number, allowing easy invalidation.
             Different eviction policies can be configured per function.
+        error_on_affect_failure: If True, AfterEffect failures raise exceptions.
+            If False (default), AfterEffect errors are logged but don't stop execution.
 
     Returns:
         Decorated function that logs execution time and caches results.
@@ -80,6 +85,22 @@ def step(
         ... def updated_function(x):
         ...     return new_logic(x)
         # Cache miss - version 2 doesn't match version 1 cache
+
+        Using AfterEffects for automatic visualization:
+
+        >>> from typing import Annotated
+        >>> import mlflow
+        >>> from kissml import step, AfterEffect, CacheConfig
+        >>>
+        >>> class HTMLVisualizer(AfterEffect):
+        ...     def __call__(self, result, was_cached, func_name, execution_time):
+        ...         result.head(100).to_html(f"{func_name}.html")
+        ...         mlflow.log_artifact(f"{func_name}.html")
+        >>>
+        >>> @step(cache=CacheConfig(version=1))
+        ... def load_data() -> Annotated[pd.DataFrame, HTMLVisualizer()]:
+        ...     return pd.read_csv("data.csv")
+        # AfterEffect runs automatically on both cached and fresh results
     """
 
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
@@ -92,6 +113,7 @@ def step(
         @wraps(func_typed)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             start_time = time.time()
+            was_cached = False
 
             # Handle caching if enabled
             if cache is not None:
@@ -114,29 +136,61 @@ def step(
                     cache_key, default=_CACHE_MISS
                 )
                 if cached_result is not _CACHE_MISS:
+                    result = cached_result
+                    was_cached = True
                     execution_time = time.time() - start_time
                     if log_level is not None:
                         logging.log(
                             log_level,
                             f"{func_typed.__name__} completed in {execution_time:.4f} seconds (cached)",
                         )
-                    return cached_result
+                else:
+                    # Execute function if not cached
+                    result = func_typed(*args, **kwargs)
+                    execution_time = time.time() - start_time
+                    cache_instance.set(cache_key, result)
+                    if log_level is not None:
+                        logging.log(
+                            log_level,
+                            f"{func_typed.__name__} completed in {execution_time:.4f} seconds",
+                        )
+            else:
+                # Execute function without caching
+                result = func_typed(*args, **kwargs)
+                execution_time = time.time() - start_time
 
-            # Execute function
-            result = func_typed(*args, **kwargs)
-            execution_time = time.time() - start_time
+                # Log execution time if logging is enabled
+                if log_level is not None:
+                    logging.log(
+                        log_level,
+                        f"{func_typed.__name__} completed in {execution_time:.4f} seconds",
+                    )
 
-            # Store result in cache if caching is enabled
-            if cache is not None:
-                cache_instance.set(cache_key, result)
-
-            # Log execution time if logging is enabled
-            if log_level is not None:
-                logging.log(
-                    log_level,
-                    f"{func_typed.__name__} completed in {execution_time:.4f} seconds",
-                )
-
+            # Execute AfterEffects from type annotations
+            hints = get_type_hints(func_typed, include_extras=True)
+            if "return" in hints and hasattr(hints["return"], "__metadata__"):
+                # Process effects left-to-right
+                for effect in hints["return"].__metadata__:
+                    if isinstance(effect, AfterEffect):
+                        if error_on_affect_failure:
+                            effect(
+                                result,
+                                was_cached,
+                                func_typed.__name__,
+                                execution_time,
+                            )
+                        else:
+                            try:
+                                effect(
+                                    result,
+                                    was_cached,
+                                    func_typed.__name__,
+                                    execution_time,
+                                )
+                            except Exception as e:
+                                logging.error(
+                                    f"AfterEffect {effect.__class__.__name__} failed for {func_typed.__name__}: {e}"
+                                )
             return result
 
         return wrapper

@@ -68,3 +68,52 @@ class Serializer(ABC):
             The deserialized object
         """
         pass
+
+
+class AfterEffect(ABC):
+    """
+    Abstract base class for side effects that run after a step completes.
+
+    AfterEffects are executed after a step function returns, whether the result
+    was freshly computed or loaded from cache. They enable visualization, logging,
+    validation, and other observability patterns without modifying the step's logic.
+
+    Example:
+        Create a custom AfterEffect to log DataFrame info:
+
+        >>> import logging
+        >>> from typing import Annotated
+        >>> from kissml import step, AfterEffect, CacheConfig
+        >>>
+        >>> class DataFrameLogger(AfterEffect):
+        ...     def __call__(self, result, was_cached, func_name, execution_time):
+        ...         logging.info(f"{func_name}: {len(result)} rows, cached={was_cached}")
+        >>>
+        >>> @step(cache=CacheConfig(version=1))
+        ... def load_data() -> Annotated[pd.DataFrame, DataFrameLogger()]:
+        ...     return pd.read_csv("data.csv")
+
+        The step decorator will automatically execute all AfterEffects in the
+        annotation, passing the result and execution metadata.
+
+    Notes:
+        - AfterEffects run on both cached and fresh results
+        - Multiple effects are executed left-to-right from the annotation
+        - Effects should observe results, not transform them
+        - The step decorator handles error handling based on configuration
+    """
+
+    @abstractmethod
+    def __call__(
+        self, result, was_cached: bool, func_name: str, execution_time: float
+    ):
+        """
+        Execute this effect on the function result.
+
+        Args:
+            result: The return value from the step function
+            was_cached: True if the result was loaded from cache, False if freshly computed
+            func_name: The name of the step function that produced this result
+            execution_time: Time in seconds taken to produce or load the result
+        """
+        pass
