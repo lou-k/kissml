@@ -16,7 +16,10 @@ pip install kissml
 
 ## Steps
 
-The `@step` decorator provides execution tracking and persistent disk-based caching for your functions.
+The `@step` decorator provides:
+* execution tracking
+* persistent disk-based caching for your functions
+* post-run execution (i.e., after effects) for the return value -- useful to visualize data or log stats.
 
 ### Basic Usage
 
@@ -120,6 +123,60 @@ def lrs_cache(x):
 @step(cache=CacheConfig(version=1, eviction_policy=EvictionPolicy.LEAST_FREQUENTLY_USED))
 def lfu_cache(x):
     return x
+```
+
+### AfterEffects
+
+AfterEffects allow you to automatically execute side effects (like visualization, logging, or validation) after a step completes, whether the result was cached or freshly computed.
+
+```python
+from typing import Annotated
+from kissml import step, AfterEffect, CacheConfig
+import mlflow
+
+# Define a custom AfterEffect
+class HTMLVisualizer(AfterEffect):
+    def __init__(self, max_rows=100):
+        self.max_rows = max_rows
+    
+    def __call__(self, result, was_cached, func_name, execution_time):
+        # Create HTML preview
+        html = result.head(self.max_rows).to_html()
+        html = f"<h3>{func_name} - {execution_time:.2f}s {'(cached)' if was_cached else ''}</h3>" + html
+        
+        # Log to MLflow
+        with open(f"{func_name}.html", "w") as f:
+            f.write(html)
+        mlflow.log_artifact(f"{func_name}.html")
+
+# Use it with type annotations
+@step(cache=CacheConfig(version=1))
+def load_data() -> Annotated[pd.DataFrame, HTMLVisualizer(max_rows=200)]:
+    return pd.read_csv("data.csv")
+
+# Multiple effects run left-to-right
+class DatasetLogger(AfterEffect):
+    def __call__(self, result, was_cached, func_name, execution_time):
+        if not was_cached:  # Only log once
+            mlflow.log_metric(f"{func_name}_rows", len(result))
+
+@step(cache=CacheConfig(version=1))
+def process() -> Annotated[pd.DataFrame, DatasetLogger(), HTMLVisualizer()]:
+    # Both effects run automatically after the function completes
+    return load_data()
+```
+
+**Error Handling**: Control whether AfterEffect failures stop execution:
+```python
+# Default: errors are logged but don't stop execution
+@step(cache=CacheConfig(version=1))
+def safe_pipeline() -> Annotated[pd.DataFrame, MyVisualizer()]:
+    return data
+
+# Strict mode: effect errors raise exceptions
+@step(cache=CacheConfig(version=1), error_on_affect_failure=True)
+def strict_pipeline() -> Annotated[pd.DataFrame, MyVisualizer()]:
+    return data
 ```
 
 ### Configuration
