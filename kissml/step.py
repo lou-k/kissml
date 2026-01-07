@@ -18,7 +18,7 @@ _CACHE_MISS = object()
 def step(
     log_level: Optional[int] = None,
     cache: Optional[CacheConfig] = None,
-    error_on_affect_failure: bool = False,
+    error_on_effect_failure: bool = False,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator for machine learning pipeline steps.
@@ -39,7 +39,7 @@ def step(
             If provided, results are cached to disk based on function arguments.
             Cache keys include the version number, allowing easy invalidation.
             Different eviction policies can be configured per function.
-        error_on_affect_failure: If True, AfterEffect failures raise exceptions.
+        error_on_effect_failure: If True, AfterEffect failures raise exceptions.
             If False (default), AfterEffect errors are logged but don't stop execution.
 
     Returns:
@@ -110,6 +110,9 @@ def step(
         # Get function signature once at decoration time
         sig = inspect.signature(func_typed)
 
+        # Cache type hints in closure to avoid repeated get_type_hints() calls
+        type_hints_cache: Optional[dict] = None
+
         @wraps(func_typed)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             start_time = time.time()
@@ -168,14 +171,17 @@ def step(
 
             # Execute AfterEffects from type annotations
             # Lazily resolve and cache type hints to avoid repeated work on each call
-            if not hasattr(wrapper, "_type_hints"):
-                wrapper._type_hints = get_type_hints(func_typed, include_extras=True)
-            hints = cast(dict, wrapper._type_hints)
+            nonlocal type_hints_cache
+            if type_hints_cache is None:
+                type_hints_cache = get_type_hints(
+                    func_typed, include_extras=True
+                )
+            hints = type_hints_cache
             if "return" in hints and hasattr(hints["return"], "__metadata__"):
                 # Process effects left-to-right
                 for effect in hints["return"].__metadata__:
                     if isinstance(effect, AfterEffect):
-                        if error_on_affect_failure:
+                        if error_on_effect_failure:
                             effect(
                                 result,
                                 was_cached,

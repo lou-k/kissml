@@ -128,11 +128,11 @@ def test_multiple_after_effects_called():
     assert call_order == ["A", "B", "C"]
 
 
-def test_error_on_affect_failure_false():
-    """Test that AfterEffect errors are caught when error_on_affect_failure=False."""
+def test_error_on_effect_failure_false():
+    """Test that AfterEffect errors are caught when error_on_effect_failure=False."""
     failing_effect = FailingAfterEffect()
 
-    @step(error_on_affect_failure=False)
+    @step(error_on_effect_failure=False)
     def compute(x: int) -> Annotated[int, failing_effect]:
         return x + 10
 
@@ -141,11 +141,11 @@ def test_error_on_affect_failure_false():
     assert result == 15
 
 
-def test_error_on_affect_failure_true():
-    """Test that AfterEffect errors are raised when error_on_affect_failure=True."""
+def test_error_on_effect_failure_true():
+    """Test that AfterEffect errors are raised when error_on_effect_failure=True."""
     failing_effect = FailingAfterEffect()
 
-    @step(error_on_affect_failure=True)
+    @step(error_on_effect_failure=True)
     def compute(x: int) -> Annotated[int, failing_effect]:
         return x + 10
 
@@ -160,7 +160,7 @@ def test_multiple_effects_one_fails_strict_mode():
     failing_effect = FailingAfterEffect()
     effect2 = RecordingAfterEffect()
 
-    @step(error_on_affect_failure=True)
+    @step(error_on_effect_failure=True)
     def compute(x: int) -> Annotated[int, effect1, failing_effect, effect2]:
         return x + 10
 
@@ -179,7 +179,7 @@ def test_multiple_effects_one_fails_permissive_mode():
     failing_effect = FailingAfterEffect()
     effect2 = RecordingAfterEffect()
 
-    @step(error_on_affect_failure=False)
+    @step(error_on_effect_failure=False)
     def compute(x: int) -> Annotated[int, effect1, failing_effect, effect2]:
         return x + 10
 
