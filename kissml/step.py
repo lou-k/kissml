@@ -167,7 +167,10 @@ def step(
                     )
 
             # Execute AfterEffects from type annotations
-            hints = get_type_hints(func_typed, include_extras=True)
+            # Lazily resolve and cache type hints to avoid repeated work on each call
+            if not hasattr(wrapper, "_type_hints"):
+                wrapper._type_hints = get_type_hints(func_typed, include_extras=True)
+            hints = cast(dict, wrapper._type_hints)
             if "return" in hints and hasattr(hints["return"], "__metadata__"):
                 # Process effects left-to-right
                 for effect in hints["return"].__metadata__:
