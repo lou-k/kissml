@@ -2,6 +2,13 @@
 
 from kissml.settings import settings
 from kissml.step import step
-from kissml.types import CacheConfig, EvictionPolicy, Serializer
+from kissml.types import AfterEffect, CacheConfig, EvictionPolicy, Serializer
 
-__all__ = ["step", "CacheConfig", "EvictionPolicy", "Serializer", "settings"]
+__all__ = [
+    "step",
+    "CacheConfig",
+    "EvictionPolicy",
+    "Serializer",
+    "AfterEffect",
+    "settings",
+]
