@@ -163,7 +163,7 @@ class DatasetLogger(AfterEffect):
 @step(cache=CacheConfig(version=1))
 def process() -> Annotated[pd.DataFrame, DatasetLogger(), HTMLVisualizer()]:
     # Both effects run automatically after the function completes
-    return processed_data
+    return load_data()
 ```
 
 **Error Handling**: Control whether AfterEffect failures stop execution:
