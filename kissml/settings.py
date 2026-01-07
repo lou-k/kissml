@@ -46,6 +46,7 @@ class Settings(BaseSettings):
         env_prefix="KISSML_",
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     cache_directory: Path = Path.home() / ".kissml"
