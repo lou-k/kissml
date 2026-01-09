@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.1.1 (2026-01-09)
+
+### Bug Fixes
+
+- Switch to shah256 for default hash function
+  ([`6bbb754`](https://github.com/lou-k/kissml/commit/6bbb754e620f0db4d356a460b7a73621015aec95))
+
+- Switch to shah256 for default hash function
+  ([`981718d`](https://github.com/lou-k/kissml/commit/981718d2c3c1d4429564b3b92d9954199b8e39dc))
+
+
 ## v0.1.0 (2026-01-07)
 
 ### Features
