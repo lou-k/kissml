@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-01-09)
+
+### Features
+
+- Add numpy array to unhashable types
+  ([`0ae81f9`](https://github.com/lou-k/kissml/commit/0ae81f975c8d9e3c6f27292c124059ad94866381))
+
+
 ## v0.1.2 (2026-01-09)
 
 ### Bug Fixes
