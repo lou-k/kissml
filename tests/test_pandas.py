@@ -1,6 +1,7 @@
 import tempfile
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -290,5 +291,67 @@ def test_dataframe_with_dict_columns():
         }
     )
     result3 = process_dataframe_with_dicts(df3)
+    assert result3 == 2
+    assert call_count == 2  # Cache miss
+
+
+def test_dataframe_with_array_columns():
+    """Test that DataFrames with numpy array columns can be hashed for cache keys."""
+    call_count = 0
+
+    @step(cache=CacheConfig(version=0))
+    def process_dataframe_with_arrays(df: pd.DataFrame) -> int:
+        nonlocal call_count
+        call_count += 1
+        return len(df)
+
+    # Create DataFrame with numpy array column (common in ML/data analysis)
+    df1 = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+            "features": [
+                np.array([1.0, 2.0, 3.0]),
+                np.array([4.0, 5.0, 6.0]),
+                np.array([7.0, 8.0, 9.0]),
+            ],
+        }
+    )
+
+    # First call - cache miss
+    result1 = process_dataframe_with_arrays(df1)
+    assert result1 == 3
+    assert call_count == 1
+
+    # Create identical DataFrame - should hit cache
+    df2 = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+            "features": [
+                np.array([1.0, 2.0, 3.0]),
+                np.array([4.0, 5.0, 6.0]),
+                np.array([7.0, 8.0, 9.0]),
+            ],
+        }
+    )
+
+    # Second call with identical DataFrame - should hit cache
+    result2 = process_dataframe_with_arrays(df2)
+    assert result2 == 3
+    assert call_count == 1  # Cache hit
+
+    # Different DataFrame - should miss cache
+    df3 = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "name": ["Alice", "Bob"],
+            "features": [
+                np.array([1.0, 2.0, 3.0]),
+                np.array([4.0, 5.0, 6.0]),
+            ],
+        }
+    )
+    result3 = process_dataframe_with_arrays(df3)
     assert result3 == 2
     assert call_count == 2  # Cache miss

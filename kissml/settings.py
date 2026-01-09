@@ -16,19 +16,24 @@ from kissml.types import Serializer
 def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
     rv: dict[type, Callable[[Any], str]] = {}
     try:
+        import numpy as np
         import pandas as pd
 
         def _stringify_unhashable(obj):
-            """Convert DataFrames or Series with dict/list columns to hashable form."""
+            """Convert DataFrames or Series with dict/list/array columns to hashable form."""
             if isinstance(obj, pd.DataFrame):
                 obj = obj.copy()
                 for col in obj.columns:
                     obj[col] = obj[col].apply(
-                        lambda x: str(x) if isinstance(x, (dict, list)) else x
+                        lambda x: str(x)
+                        if isinstance(x, (dict, list, np.ndarray))
+                        else x
                     )
             elif isinstance(obj, pd.Series):
                 obj = obj.apply(
-                    lambda x: str(x) if isinstance(x, (dict, list)) else x
+                    lambda x: str(x)
+                    if isinstance(x, (dict, list, np.ndarray))
+                    else x
                 )
             return obj
 
