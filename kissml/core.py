@@ -12,7 +12,7 @@ from kissml.types import EvictionPolicy
 def _deterministic_hash(value: Any) -> str:
     """
     Compute a deterministic hash for any value using SHA256.
-    
+
     Unlike Python's built-in hash(), this produces the same hash across
     different Python sessions, making it suitable for persistent caching.
     """
