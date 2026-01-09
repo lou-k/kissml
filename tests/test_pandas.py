@@ -230,3 +230,65 @@ def test_dict_with_dataframes():
     assert call_count == 2
     assert len(result3["first"]) == 5
     assert result3["count"] == 5
+
+
+def test_dataframe_with_dict_columns():
+    """Test that DataFrames with dict columns can be hashed for cache keys."""
+    call_count = 0
+
+    @step(cache=CacheConfig(version=0))
+    def process_dataframe_with_dicts(df: pd.DataFrame) -> int:
+        nonlocal call_count
+        call_count += 1
+        return len(df)
+
+    # Create DataFrame with dict column (common when loading from DuckDB/JSON)
+    df1 = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+            "metadata": [
+                {"age": 30, "city": "NYC"},
+                {"age": 25, "city": "SF"},
+                {"age": 35, "city": "LA"},
+            ],
+        }
+    )
+
+    # First call - cache miss
+    result1 = process_dataframe_with_dicts(df1)
+    assert result1 == 3
+    assert call_count == 1
+
+    # Create identical DataFrame - should hit cache
+    df2 = pd.DataFrame(
+        {
+            "id": [1, 2, 3],
+            "name": ["Alice", "Bob", "Charlie"],
+            "metadata": [
+                {"age": 30, "city": "NYC"},
+                {"age": 25, "city": "SF"},
+                {"age": 35, "city": "LA"},
+            ],
+        }
+    )
+
+    # Second call with identical DataFrame - should hit cache
+    result2 = process_dataframe_with_dicts(df2)
+    assert result2 == 3
+    assert call_count == 1  # Cache hit
+
+    # Different DataFrame - should miss cache
+    df3 = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "name": ["Alice", "Bob"],
+            "metadata": [
+                {"age": 30, "city": "NYC"},
+                {"age": 25, "city": "SF"},
+            ],
+        }
+    )
+    result3 = process_dataframe_with_dicts(df3)
+    assert result3 == 2
+    assert call_count == 2  # Cache miss

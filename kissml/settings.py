@@ -18,8 +18,26 @@ def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
     try:
         import pandas as pd
 
-        rv[pd.DataFrame] = lambda df: str(pd.util.hash_pandas_object(df))
-        rv[pd.Series] = lambda s: str(pd.util.hash_pandas_object(s))
+        def _stringify_unhashable(obj):
+            """Convert DataFrames or Series with dict/list columns to hashable form."""
+            if isinstance(obj, pd.DataFrame):
+                obj = obj.copy()
+                for col in obj.columns:
+                    obj[col] = obj[col].apply(
+                        lambda x: str(x) if isinstance(x, (dict, list)) else x
+                    )
+            elif isinstance(obj, pd.Series):
+                obj = obj.apply(
+                    lambda x: str(x) if isinstance(x, (dict, list)) else x
+                )
+            return obj
+
+        rv[pd.DataFrame] = lambda df: str(
+            pd.util.hash_pandas_object(_stringify_unhashable(df))
+        )
+        rv[pd.Series] = lambda s: str(
+            pd.util.hash_pandas_object(_stringify_unhashable(s))
+        )
         rv[pd.Index] = lambda i: str(pd.util.hash_pandas_object(i))
     except ImportError:
         pass
