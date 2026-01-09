@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.1.2 (2026-01-09)
+
+### Bug Fixes
+
+- Stringfiy unhashable types in pandas containers
+  ([`08fc7e6`](https://github.com/lou-k/kissml/commit/08fc7e6c82955282a83c9dad484431193aee9d6b))
+
+
 ## v0.1.1 (2026-01-09)
 
 ### Bug Fixes
