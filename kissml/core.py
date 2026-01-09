@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from hashlib import sha256
 from typing import Any, Tuple
 
 from diskcache import Cache
@@ -8,8 +9,18 @@ from kissml.settings import settings
 from kissml.types import EvictionPolicy
 
 
+def _deterministic_hash(value: Any) -> str:
+    """
+    Compute a deterministic hash for any value using SHA256.
+    
+    Unlike Python's built-in hash(), this produces the same hash across
+    different Python sessions, making it suitable for persistent caching.
+    """
+    return sha256(str(value).encode()).hexdigest()
+
+
 def _hash_value(v: Any) -> str:
-    hash_f = settings.hash_by_type.get(type(v), lambda x: str(hash(x)))
+    hash_f = settings.hash_by_type.get(type(v), _deterministic_hash)
     return hash_f(v)
 
 
