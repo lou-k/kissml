@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-01-19)
+
+### Features
+
+- Write multi-dim numpy arrays as bytes when serializing
+  ([`cbba610`](https://github.com/lou-k/kissml/commit/cbba61054dae359f5b2fe00ac03a06eec7be8b1a))
+
+
 ## v0.2.0 (2026-01-09)
 
 ### Features

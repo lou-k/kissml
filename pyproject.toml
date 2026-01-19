@@ -1,6 +1,6 @@
 [project]
 name = "kissml"
-version = "0.2.0"
+version = "0.3.0"
 description = "Keep It Simple Stupid Tools for Machine Learning"
 authors = [{ name="Lou Kratz", email="kissml@lou.dev" }]
 readme = "README.md"
