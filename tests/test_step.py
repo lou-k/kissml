@@ -286,6 +286,43 @@ def test_different_eviction_policies_separate_caches():
     assert call_count == 2  # Cache hit in LRU cache
 
 
+def test_namespaces_create_separate_caches():
+    """Test that different namespaces create separate caches."""
+    call_count = 0
+
+    def compute(x: int) -> int:
+        nonlocal call_count
+        call_count += 1
+        return x * 2
+
+    # Same function name and eviction policy, different namespaces
+    compute_ns1 = step(
+        cache=CacheConfig(
+            version=0, eviction_policy=EvictionPolicy.NONE, namespace="ns1"
+        )
+    )(compute)
+    compute_ns2 = step(
+        cache=CacheConfig(
+            version=0, eviction_policy=EvictionPolicy.NONE, namespace="ns2"
+        )
+    )(compute)
+
+    # Call with namespace ns1
+    result1 = compute_ns1(5)
+    assert result1 == 10
+    assert call_count == 1
+
+    # Call with namespace ns2 - should not hit ns1 cache
+    result2 = compute_ns2(5)
+    assert result2 == 10
+    assert call_count == 2
+
+    # Call again with ns1 - should hit ns1 cache
+    result3 = compute_ns1(5)
+    assert result3 == 10
+    assert call_count == 2
+
+
 def test_exceptions_not_cached():
     """Test that exceptions are not cached."""
     call_count = 0

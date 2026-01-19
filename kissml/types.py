@@ -35,6 +35,10 @@ class CacheConfig(BaseModel):
         default=0,
         description="The cache version. Change this to invalidate all entries on a re-run.",
     )
+    namespace: str | None = Field(
+        default=None,
+        description="Optional namespace for the cache. Useful for isolating caches between different parts of an application.",
+    )
 
 
 class Serializer(ABC):

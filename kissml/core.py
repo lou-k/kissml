@@ -54,15 +54,20 @@ def create_cache_key(**kwargs: dict[str, Any]) -> OrderedDict:
     return hashes
 
 
-_caches: dict[Tuple[str, EvictionPolicy], Cache] = {}
+_caches: dict[Tuple[str, EvictionPolicy, str | None], Cache] = {}
 
 
-def get_cache(function_name: str, eviction_policy: EvictionPolicy) -> Cache:
+def get_cache(
+    function_name: str, eviction_policy: EvictionPolicy, namespace: str | None
+) -> Cache:
     global _caches
-    key = (function_name, eviction_policy)
+    key = (function_name, eviction_policy, namespace)
     if key not in _caches:
         cache_directory = (
-            settings.cache_directory / function_name / eviction_policy.value
+            settings.cache_directory
+            / (namespace or "")
+            / function_name
+            / eviction_policy.value
         )
         _caches[key] = Cache(
             directory=str(cache_directory),

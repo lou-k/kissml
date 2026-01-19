@@ -122,7 +122,7 @@ def step(
             if cache is not None:
                 # Get the cache for this function
                 cache_instance = get_cache(
-                    func_typed.__name__, cache.eviction_policy
+                    func_typed.__name__, cache.eviction_policy, cache.namespace
                 )
 
                 # Bind arguments to normalize positional and keyword args
