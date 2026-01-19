@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-01-19)
+
+### Features
+
+- Add namespace option
+  ([`854a46e`](https://github.com/lou-k/kissml/commit/854a46ef22c6ca3aad73fa5d272c4d28b5c6f669))
+
+
 ## v0.3.0 (2026-01-19)
 
 ### Features
