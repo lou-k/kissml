@@ -1,5 +1,12 @@
+import json
 import pickle
-from typing import Any, BinaryIO
+from io import BytesIO
+from typing import TYPE_CHECKING, Any, BinaryIO
+
+import numpy as np
+
+if TYPE_CHECKING:
+    pass
 
 from kissml.types import Serializer
 
@@ -16,19 +23,101 @@ class PandasSerializer(Serializer):
         ValueError: If the value is not a pandas DataFrame.
     """
 
-    def serialize(self, value: Any, out: BinaryIO) -> None:
+    def _ndarray_to_bytes(self, arr: Any) -> bytes | None:
+        if arr is None:
+            return None
+        if not isinstance(arr, np.ndarray):
+            raise ValueError("Input must be a numpy ndarray or None.")
+        # Fix array-of-arrays: if arr is a 1D object array of ndarrays, stack it
+        if (
+            arr.dtype == object
+            and arr.ndim == 1
+            and arr.size > 0
+            and all(isinstance(x, np.ndarray) for x in arr)
+        ):
+            try:
+                arr = np.stack(arr)
+            except Exception:
+                pass
+        # If object array of strings, convert to fixed-width string dtype
+        if (
+            arr.dtype == object
+            and arr.size > 0
+            and all(isinstance(x, str) for x in arr.flat)
+        ):
+            arr = arr.astype(str)
+        buffer = BytesIO()
+        np.save(buffer, arr, allow_pickle=False)
+        buffer.seek(0)
+        return buffer.read()
+
+    def _bytes_to_ndarray(self, b: bytes | None) -> Any:
+        if b is None:
+            return None
+        buffer = BytesIO(b)
+        return np.load(buffer, allow_pickle=False)
+
+    def to_packed_dataframe(self, df):
+        """
+        Convert a DataFrame with ndarray columns to a packed format suitable for Parquet storage.
+        """
         import pandas as pd
 
-        if not isinstance(value, pd.DataFrame):
+        if not isinstance(df, pd.DataFrame):
             raise ValueError(
                 "PandasSerializer can only serialize data frames."
             )
-        value.to_parquet(out)
+
+        columns_with_ndarrays = [
+            col
+            for col in df.columns
+            if any(isinstance(item, np.ndarray) for item in df[col])
+        ]
+
+        # Create a copy to avoid modifying the original
+        df = df.copy()
+        for col in columns_with_ndarrays:
+            df[col] = df[col].apply(self._ndarray_to_bytes)
+        return df, columns_with_ndarrays
+
+    def serialize(self, value: Any, out: BinaryIO) -> None:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        df, columns_with_ndarrays = self.to_packed_dataframe(value)
+
+        # Store metadata about which columns were converted
+        metadata = {"ndarray_columns": columns_with_ndarrays}
+        table = pa.Table.from_pandas(df)
+        table = table.replace_schema_metadata(
+            {
+                **(table.schema.metadata or {}),
+                b"serializer_metadata": json.dumps(metadata).encode(),
+            }
+        )
+        pq.write_table(table, out)
 
     def deserialize(self, input: BinaryIO) -> Any:
-        import pandas as pd
+        import pyarrow.parquet as pq
 
-        return pd.read_parquet(input)
+        table = pq.read_table(input)
+        df = table.to_pandas()
+
+        # Read metadata to determine which columns to convert back
+        metadata_bytes = (
+            table.schema.metadata.get(b"serializer_metadata")
+            if table.schema.metadata
+            else None
+        )
+        if metadata_bytes:
+            metadata = json.loads(metadata_bytes.decode())
+            ndarray_columns = metadata.get("ndarray_columns", [])
+
+            for col in ndarray_columns:
+                if col in df.columns:
+                    df[col] = df[col].apply(self._bytes_to_ndarray)
+
+        return df
 
 
 class ListSerializer(Serializer):

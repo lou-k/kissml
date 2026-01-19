@@ -355,3 +355,47 @@ def test_dataframe_with_array_columns():
     result3 = process_dataframe_with_arrays(df3)
     assert result3 == 2
     assert call_count == 2  # Cache miss
+
+
+def test_dataframe_with_ndarray_column_and_nones():
+    """Test serialization of DataFrame with ndarray column containing None values."""
+    from io import BytesIO
+
+    import numpy as np
+    import pandas as pd
+
+    from kissml.serializers import PandasSerializer
+
+    df = pd.DataFrame(
+        {
+            "id": [1, 2, 3, 4],
+            "matrix": [
+                np.eye(2),
+                None,
+                np.eye(2),
+                None,
+            ],
+        }
+    )
+
+    serializer = PandasSerializer()
+    buffer = BytesIO()
+    serializer.serialize(df, buffer)
+    buffer.seek(0)
+    result = serializer.deserialize(buffer)
+
+    # Check structure
+    assert list(result.columns) == ["id", "matrix"]
+    assert len(result) == 4
+
+    # Check values
+    pd.testing.assert_series_equal(result["id"], df["id"])
+
+    # Check ndarray values and Nones
+    for i in range(len(df)):
+        if df["matrix"].iloc[i] is None:
+            assert result["matrix"].iloc[i] is None
+        else:
+            np.testing.assert_array_equal(
+                result["matrix"].iloc[i], df["matrix"].iloc[i]
+            )
