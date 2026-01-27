@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.1 (2026-01-27)
+
+### Bug Fixes
+
+- Speed up cache key gen time for dataframes
+  ([`61eb28b`](https://github.com/lou-k/kissml/commit/61eb28bbd5c83c742e0f35169976dc89182e0c01))
+
+
 ## v0.4.0 (2026-01-19)
 
 ### Features
