@@ -16,33 +16,19 @@ from kissml.types import Serializer
 def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
     rv: dict[type, Callable[[Any], str]] = {}
     try:
-        import numpy as np
+        from hashlib import sha256
+        from io import BytesIO
         import pandas as pd
 
-        def _stringify_unhashable(obj):
-            """Convert DataFrames or Series with dict/list/array columns to hashable form."""
-            if isinstance(obj, pd.DataFrame):
-                obj = obj.copy()
-                for col in obj.columns:
-                    obj[col] = obj[col].apply(
-                        lambda x: str(x)
-                        if isinstance(x, (dict, list, np.ndarray))
-                        else x
-                    )
-            elif isinstance(obj, pd.Series):
-                obj = obj.apply(
-                    lambda x: str(x)
-                    if isinstance(x, (dict, list, np.ndarray))
-                    else x
-                )
-            return obj
+        def _hash_dataframe_via_serialization(df: pd.DataFrame) -> str:
+            """Hash a DataFrame by serializing it to Parquet and hashing the bytes."""
+            serializer = PandasSerializer()
+            buffer = BytesIO()
+            serializer.serialize(df, buffer)
+            return sha256(buffer.getvalue()).hexdigest()
 
-        rv[pd.DataFrame] = lambda df: str(
-            pd.util.hash_pandas_object(_stringify_unhashable(df))
-        )
-        rv[pd.Series] = lambda s: str(
-            pd.util.hash_pandas_object(_stringify_unhashable(s))
-        )
+        rv[pd.DataFrame] = _hash_dataframe_via_serialization
+        rv[pd.Series] = lambda s: str(pd.util.hash_pandas_object(s))
         rv[pd.Index] = lambda i: str(pd.util.hash_pandas_object(i))
     except ImportError:
         pass
