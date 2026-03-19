@@ -1,9 +1,10 @@
 import inspect
 import logging
 import time
+from collections.abc import Callable
 from functools import wraps
 from types import FunctionType
-from typing import Callable, Optional, ParamSpec, TypeVar, cast, get_type_hints
+from typing import ParamSpec, TypeVar, cast, get_type_hints
 
 from .core import create_cache_key, get_cache
 from .types import AfterEffect, CacheConfig
@@ -16,8 +17,8 @@ _CACHE_MISS = object()
 
 
 def step(
-    log_level: Optional[int] = None,
-    cache: Optional[CacheConfig] = None,
+    log_level: int | None = None,
+    cache: CacheConfig | None = None,
     error_on_effect_failure: bool = False,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
@@ -111,7 +112,7 @@ def step(
         sig = inspect.signature(func_typed)
 
         # Cache type hints in closure to avoid repeated get_type_hints() calls
-        type_hints_cache: Optional[dict] = None
+        type_hints_cache: dict | None = None
 
         @wraps(func_typed)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
