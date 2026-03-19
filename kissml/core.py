@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from hashlib import sha256
-from typing import Any, Tuple
+from typing import Any
 
 from diskcache import Cache
 
@@ -54,7 +54,7 @@ def create_cache_key(**kwargs: dict[str, Any]) -> OrderedDict:
     return hashes
 
 
-_caches: dict[Tuple[str, EvictionPolicy, str | None], Cache] = {}
+_caches: dict[tuple[str, EvictionPolicy, str | None], Cache] = {}
 
 
 def get_cache(

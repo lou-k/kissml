@@ -11,8 +11,8 @@ kissml (Keep It Simple Stupid Tools for Machine Learning) is a Python library th
 ### Environment Setup
 This project uses `uv` for dependency management:
 ```bash
-# Install dependencies (includes dev dependencies by default)
-uv sync
+# Install dependencies (includes dev dependencies)
+uv sync --extra dev
 
 # Activate virtual environment
 source .venv/bin/activate
@@ -44,7 +44,7 @@ ruff format kissml/ tests/
 ruff check kissml/ tests/ --fix
 
 # Type check (uses ty, not mypy)
-ty check kissml --ignore unresolved-import
+ty check kissml
 
 # Run pre-commit hooks manually
 pre-commit run --all-files
@@ -118,7 +118,7 @@ Pre-commit hooks automatically run ruff-check, ruff-format, isort, and ty on com
 
 ## Important Notes
 
-- The type checker is `ty`, NOT `mypy`. Use `ty check kissml --ignore unresolved-import` for type checking.
+- The type checker is `ty`, NOT `mypy`. Use `ty check kissml` for type checking.
 - Line length is 79 characters (configured in pyproject.toml).
 - The project requires Python 3.12+.
 - When adding new serializers, register them in `settings._default_serializer_by_type()` and add corresponding hash functions to `settings._default_hash_by_type()` if needed.
