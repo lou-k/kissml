@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.2 (2026-03-19)
+
+### Bug Fixes
+
+- Trigger release
+  ([`cd8a555`](https://github.com/lou-k/kissml/commit/cd8a55519163267a77022caed952ff2e35d14417))
+
+
 ## v0.4.1 (2026-01-27)
 
 ### Bug Fixes
