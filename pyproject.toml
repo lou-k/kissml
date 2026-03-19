@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "kissml"
-version = "0.4.2"
+dynamic = ["version"]
 description = "Keep It Simple Stupid Tools for Machine Learning"
 authors = [{ name="Lou Kratz", email="kissml@lou.dev" }]
 readme = "README.md"
@@ -37,6 +37,9 @@ dev = [
     "ruff>=0.1.0",
     "ty>=0.0.8",
 ]
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["kissml"]

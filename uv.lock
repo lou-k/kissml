@@ -231,7 +231,6 @@ wheels = [
 
 [[package]]
 name = "kissml"
-version = "0.4.2"
 source = { editable = "." }
 dependencies = [
     { name = "diskcache" },
