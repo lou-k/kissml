@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +19,7 @@ def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
     try:
         from hashlib import sha256
         from io import BytesIO
+
         import pandas as pd
 
         def _hash_dataframe_via_serialization(df: pd.DataFrame) -> str:
