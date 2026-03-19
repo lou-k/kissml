@@ -57,3 +57,9 @@ jobs:
         with:
           tag: ${{ steps.bump-semver.outputs.new_version }}
           message: ${{ steps.bump-semver.outputs.new_version }}
+
+  publish:
+    needs: release
+    uses: ./.github/workflows/publish.yml
+    permissions:
+      id-token: write
