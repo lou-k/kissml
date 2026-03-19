@@ -1,20 +1,32 @@
 name: Publish
 
 on:
-  push:
-    tags:
-      - "v*"
-  workflow_call:
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
 
 jobs:
   publish:
     name: Build & Publish to PyPI
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write
+      contents: read
     steps:
+      - name: Get latest tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
