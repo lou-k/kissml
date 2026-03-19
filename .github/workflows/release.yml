@@ -75,9 +75,3 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "${{ steps.bump.outputs.new_version }}" -m "${{ steps.bump.outputs.new_version }}"
           git push origin "${{ steps.bump.outputs.new_version }}"
-
-  publish:
-    needs: release
-    uses: ./.github/workflows/publish.yml
-    permissions:
-      id-token: write
