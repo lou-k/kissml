@@ -179,6 +179,33 @@ def strict_pipeline() -> Annotated[pd.DataFrame, MyVisualizer()]:
     return data
 ```
 
+**Global AfterEffects**: Register an AfterEffect once and have it fire after every `@step` call — no per-step annotation required. Useful for cross-cutting concerns like logging, persistence, or experiment tracking.
+
+```python
+from kissml import settings, step, AfterEffect
+
+class GCSPersist(AfterEffect):
+    def __init__(self, bucket, prefix):
+        self.bucket, self.prefix = bucket, prefix
+
+    def __call__(self, result, was_cached, func_name, execution_time):
+        # upload `result` to gs://{bucket}/{prefix}/{func_name}.parquet
+        ...
+
+# Register once — fires for every @step call from now on
+settings.global_after_effects.append(GCSPersist("my-bucket", "run-123"))
+
+@step()
+def load_data() -> pd.DataFrame:
+    return pd.read_csv("data.csv")  # GCSPersist runs after this returns
+
+@step()
+def transform(df: pd.DataFrame) -> pd.DataFrame:
+    return df.dropna()              # GCSPersist runs here too
+```
+
+Per-step effects (declared in the return annotation) fire first, then global effects. Both honor the `error_on_effect_failure` flag on the step.
+
 ### Configuration
 
 Configure the cache directory via environment variable or settings:

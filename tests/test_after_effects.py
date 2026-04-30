@@ -25,6 +25,18 @@ def clean_cache():
         settings.cache_directory = original_cache_dir
 
 
+@pytest.fixture
+def clean_global_effects():
+    """Reset settings.global_after_effects before and after each test."""
+    original = list(settings.global_after_effects)
+    settings.global_after_effects.clear()
+    try:
+        yield settings.global_after_effects
+    finally:
+        settings.global_after_effects.clear()
+        settings.global_after_effects.extend(original)
+
+
 class RecordingAfterEffect(AfterEffect):
     """AfterEffect that records when it's called."""
 
@@ -53,6 +65,19 @@ class FailingAfterEffect(AfterEffect):
         self, result, was_cached: bool, func_name: str, execution_time: float
     ):
         raise ValueError("AfterEffect intentionally failed")
+
+
+class OrderTrackingEffect(AfterEffect):
+    """AfterEffect that appends its label to a shared list when called."""
+
+    def __init__(self, label: str, call_order: list):
+        self.label = label
+        self.call_order = call_order
+
+    def __call__(
+        self, result, was_cached: bool, func_name: str, execution_time: float
+    ):
+        self.call_order.append(self.label)
 
 
 def test_after_effect_called():
@@ -100,23 +125,9 @@ def test_after_effect_called_with_cache():
 def test_multiple_after_effects_called():
     """Test that multiple AfterEffects are called in left-to-right order."""
     call_order = []
-
-    class OrderTrackingEffect(AfterEffect):
-        def __init__(self, name):
-            self.name = name
-
-        def __call__(
-            self,
-            result,
-            was_cached: bool,
-            func_name: str,
-            execution_time: float,
-        ):
-            call_order.append(self.name)
-
-    effect_a = OrderTrackingEffect("A")
-    effect_b = OrderTrackingEffect("B")
-    effect_c = OrderTrackingEffect("C")
+    effect_a = OrderTrackingEffect("A", call_order)
+    effect_b = OrderTrackingEffect("B", call_order)
+    effect_c = OrderTrackingEffect("C", call_order)
 
     @step()
     def compute(x: int) -> Annotated[int, effect_a, effect_b, effect_c]:
@@ -213,3 +224,70 @@ def test_after_effect_with_non_annotated_type():
     result = compute(10)
     assert result == 15
     assert effect.call_count == 0
+
+
+def test_global_after_effect_fires_on_every_step(clean_global_effects):
+    """A global AfterEffect runs after every @step call, regardless of the
+    step's own return annotation."""
+    effect = RecordingAfterEffect()
+    clean_global_effects.append(effect)
+
+    @step()
+    def add(x: int, y: int) -> int:
+        return x + y
+
+    @step()
+    def multiply(x: int, y: int) -> int:
+        return x * y
+
+    add(1, 2)
+    multiply(3, 4)
+
+    assert effect.call_count == 2
+    assert {c["func_name"] for c in effect.calls} == {"add", "multiply"}
+    assert {c["result"] for c in effect.calls} == {3, 12}
+
+
+def test_global_after_effect_fires_alongside_per_step_effects(
+    clean_global_effects,
+):
+    """Per-step effects fire before global effects; both run."""
+    call_order = []
+    per_step = OrderTrackingEffect("per_step", call_order)
+    global_effect = OrderTrackingEffect("global", call_order)
+    clean_global_effects.append(global_effect)
+
+    @step()
+    def compute(x: int) -> Annotated[int, per_step]:
+        return x + 1
+
+    result = compute(10)
+
+    assert result == 11
+    assert call_order == ["per_step", "global"]
+
+
+def test_global_after_effect_error_handling(clean_global_effects):
+    """A failing global effect logs but does not stop execution when
+    error_on_effect_failure=False; it raises and stops when True."""
+    failing = FailingAfterEffect()
+    follow_up = RecordingAfterEffect()
+    clean_global_effects.append(failing)
+    clean_global_effects.append(follow_up)
+
+    @step(error_on_effect_failure=False)
+    def compute(x: int) -> int:
+        return x * 2
+
+    result = compute(5)
+    assert result == 10
+    assert follow_up.call_count == 1
+
+    @step(error_on_effect_failure=True)
+    def strict_compute(x: int) -> int:
+        return x * 2
+
+    with pytest.raises(ValueError, match="AfterEffect intentionally failed"):
+        strict_compute(5)
+    # Strict mode aborted before reaching follow_up
+    assert follow_up.call_count == 1
