@@ -182,26 +182,28 @@ def strict_pipeline() -> Annotated[pd.DataFrame, MyVisualizer()]:
 **Global AfterEffects**: Register an AfterEffect once and have it fire after every `@step` call — no per-step annotation required. Useful for cross-cutting concerns like logging, persistence, or experiment tracking.
 
 ```python
+import logging
 from kissml import settings, step, AfterEffect
 
-class GCSPersist(AfterEffect):
-    def __init__(self, bucket, prefix):
-        self.bucket, self.prefix = bucket, prefix
+class StepTimingLogger(AfterEffect):
+    """Log every step's name, runtime, and cache status."""
 
     def __call__(self, result, was_cached, func_name, execution_time):
-        # upload `result` to gs://{bucket}/{prefix}/{func_name}.parquet
-        ...
+        status = "cached" if was_cached else "fresh"
+        logging.info(
+            f"{func_name} finished in {execution_time:.3f}s ({status})"
+        )
 
 # Register once — fires for every @step call from now on
-settings.global_after_effects.append(GCSPersist("my-bucket", "run-123"))
+settings.global_after_effects.append(StepTimingLogger())
 
 @step()
 def load_data() -> pd.DataFrame:
-    return pd.read_csv("data.csv")  # GCSPersist runs after this returns
+    return pd.read_csv("data.csv")  # StepTimingLogger runs after this returns
 
 @step()
 def transform(df: pd.DataFrame) -> pd.DataFrame:
-    return df.dropna()              # GCSPersist runs here too
+    return df.dropna()              # StepTimingLogger runs here too
 ```
 
 Per-step effects (declared in the return annotation) fire first, then global effects. Both honor the `error_on_effect_failure` flag on the step.
