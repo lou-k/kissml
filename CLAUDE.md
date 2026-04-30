@@ -86,6 +86,7 @@ Pre-commit hooks automatically run ruff-check, ruff-format, isort, and ty on com
 - `cache_directory`: Defaults to `~/.kissml`
 - `hash_by_type`: Maps types to hash functions (e.g., pandas DataFrames use `pd.util.hash_pandas_object`)
 - `serialize_by_type`: Maps types to Serializer instances
+- `global_after_effects`: List of `AfterEffect` instances fired after every `@step` call, in addition to per-step effects declared via return annotations
 - Auto-registers pandas types if available
 
 **[kissml/types.py](kissml/types.py)** - Type definitions

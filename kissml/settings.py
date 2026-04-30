@@ -11,7 +11,7 @@ from kissml.serializers import (
     PandasSerializer,
     TupleSerializer,
 )
-from kissml.types import Serializer
+from kissml.types import AfterEffect, Serializer
 
 
 def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     serialize_by_type: dict[type, Serializer] = Field(
         default_factory=_default_serializer_by_type,
         description="A mapping of python type -> custom serializers to use for disk caching.",
+    )
+
+    global_after_effects: list[AfterEffect] = Field(
+        default_factory=list,
+        description="AfterEffects that run after every @step call, in addition to per-step effects declared in return annotations.",
     )
 
 

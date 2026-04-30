@@ -7,6 +7,7 @@ from types import FunctionType
 from typing import ParamSpec, TypeVar, cast, get_type_hints
 
 from .core import create_cache_key, get_cache
+from .settings import settings
 from .types import AfterEffect, CacheConfig
 
 P = ParamSpec("P")
@@ -170,6 +171,27 @@ def step(
                         f"{func_typed.__name__} completed in {execution_time:.4f} seconds",
                     )
 
+            def _run_effect(effect: AfterEffect) -> None:
+                if error_on_effect_failure:
+                    effect(
+                        result,
+                        was_cached,
+                        func_typed.__name__,
+                        execution_time,
+                    )
+                else:
+                    try:
+                        effect(
+                            result,
+                            was_cached,
+                            func_typed.__name__,
+                            execution_time,
+                        )
+                    except Exception as e:
+                        logging.error(
+                            f"AfterEffect {effect.__class__.__name__} failed for {func_typed.__name__}: {e}"
+                        )
+
             # Execute AfterEffects from type annotations
             # Lazily resolve and cache type hints to avoid repeated work on each call
             nonlocal type_hints_cache
@@ -182,25 +204,11 @@ def step(
                 # Process effects left-to-right
                 for effect in hints["return"].__metadata__:
                     if isinstance(effect, AfterEffect):
-                        if error_on_effect_failure:
-                            effect(
-                                result,
-                                was_cached,
-                                func_typed.__name__,
-                                execution_time,
-                            )
-                        else:
-                            try:
-                                effect(
-                                    result,
-                                    was_cached,
-                                    func_typed.__name__,
-                                    execution_time,
-                                )
-                            except Exception as e:
-                                logging.error(
-                                    f"AfterEffect {effect.__class__.__name__} failed for {func_typed.__name__}: {e}"
-                                )
+                        _run_effect(effect)
+
+            for effect in settings.global_after_effects:
+                _run_effect(effect)
+
             return result
 
         return wrapper
