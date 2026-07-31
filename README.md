@@ -208,6 +208,39 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
 
 Per-step effects (declared in the return annotation) fire first, then global effects. Both honor the `error_on_effect_failure` flag on the step.
 
+### Subpipelines
+
+The `@subpipeline` decorator composes steps into an uncached pipeline: it calls other (typically cached) `@step` functions and returns their results, doing no computation of its own. It never caches -- caching a composition would skip its body on a hit, silently skipping the inner steps too.
+
+Because nothing is ever cached, a subpipeline's body runs on every call, so any AfterEffects declared on its return type are guaranteed to fire every time -- unlike a plain, undecorated function, where `Annotated` metadata is inert and those effects would never run.
+
+```python
+from typing import Annotated
+from kissml import step, subpipeline, AfterEffect, CacheConfig
+
+class RowCountLogger(AfterEffect):
+    def __call__(self, result, was_cached, func_name, execution_time):
+        print(f"{func_name}: {len(result)} rows")
+
+@step(cache=CacheConfig(version=1))
+def load_data() -> pd.DataFrame:
+    return pd.read_csv("data.csv")
+
+@step(cache=CacheConfig(version=1))
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+    return df.dropna()
+
+@subpipeline()
+def prepare_data() -> Annotated[pd.DataFrame, RowCountLogger()]:
+    return clean_data(load_data())
+
+prepare_data()
+# load_data/clean_data may each hit cache, but prepare_data's own
+# body -- and RowCountLogger -- run every time.
+```
+
+`subpipeline()` has no `cache` parameter (caching is deliberately unsupported) but accepts the same `log_level` and `error_on_effect_failure` options as `step()`. Both decorators stamp `__kissml_kind__` on the wrapped function (`"step"` or `"subpipeline"`) so tooling can classify decorated functions by introspection.
+
 ### Configuration
 
 Configure the cache directory via environment variable or settings:

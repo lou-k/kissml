@@ -211,6 +211,93 @@ def step(
 
             return result
 
+        wrapper.__kissml_kind__ = "step"  # type: ignore[attr-defined]
+
+        return wrapper
+
+    return decorator
+
+
+def subpipeline(
+    log_level: int | None = None,
+    error_on_effect_failure: bool = False,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """
+    Decorator for composing steps into an uncached pipeline.
+
+    A subpipeline is an uncached composition of steps: it calls other
+    (typically cached) `@step` functions and returns their results,
+    performing no computation of its own. It never caches, because
+    caching a composition would skip its body on a cache hit and, with
+    it, the calls to the inner steps -- silently suppressing their own
+    caching, logging, and AfterEffects.
+
+    Because a subpipeline's body always runs (nothing is ever cached),
+    any AfterEffects declared in its `Annotated` return type are
+    guaranteed to fire on every call. This is a stronger guarantee than
+    a plain, undecorated function gets: `Annotated` metadata on a bare
+    function's return type is inert -- Python attaches no runtime
+    behavior to it, so those effects would never execute.
+
+    This decorator wraps `step(cache=None, ...)` and additionally stamps
+    `__kissml_kind__ = "subpipeline"` on the returned function (as
+    opposed to `__kissml_kind__ = "step"`, which `step()` stamps on its
+    own wrapper), so tooling can distinguish the two by introspection.
+
+    Args:
+        log_level: Optional logging level (e.g., logging.INFO, logging.DEBUG).
+            If provided, logs execution time for every call. If None, no
+            logging is performed.
+        error_on_effect_failure: If True, AfterEffect failures raise exceptions.
+            If False (default), AfterEffect errors are logged but don't stop
+            execution.
+
+    Returns:
+        Decorated function that always executes its body and runs any
+        declared AfterEffects, with no caching support.
+
+    Notes:
+        - There is no `cache` parameter: caching is deliberately
+          unsupported so the composition's body -- and the inner steps
+          it calls -- always run.
+        - `__kissml_kind__` is set to `"subpipeline"` on the wrapper,
+          letting tooling classify decorated functions without
+          inspecting their implementation.
+
+    Examples:
+        Composing two cached steps, with an AfterEffect on the result:
+
+        >>> from typing import Annotated
+        >>> from kissml import step, subpipeline, AfterEffect, CacheConfig
+        >>>
+        >>> class RowCountLogger(AfterEffect):
+        ...     def __call__(self, result, was_cached, func_name, execution_time):
+        ...         print(f"{func_name}: {len(result)} rows")
+        >>>
+        >>> @step(cache=CacheConfig(version=1))
+        ... def load_data() -> pd.DataFrame:
+        ...     return pd.read_csv("data.csv")
+        >>>
+        >>> @step(cache=CacheConfig(version=1))
+        ... def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+        ...     return df.dropna()
+        >>>
+        >>> @subpipeline()
+        ... def prepare_data() -> Annotated[pd.DataFrame, RowCountLogger()]:
+        ...     return clean_data(load_data())
+        >>> prepare_data()
+        # load_data/clean_data may each hit cache, but prepare_data's own
+        # body -- and RowCountLogger -- run on every call.
+    """
+    base = step(
+        log_level=log_level,
+        cache=None,  # Subpipelines do not support caching
+        error_on_effect_failure=error_on_effect_failure,
+    )
+
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        wrapper = base(func)
+        wrapper.__kissml_kind__ = "subpipeline"  # type: ignore[attr-defined]
         return wrapper
 
     return decorator
