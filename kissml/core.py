@@ -20,8 +20,13 @@ def _deterministic_hash(value: Any) -> str:
 
 
 def _hash_value(v: Any) -> str:
-    hash_f = settings.hash_by_type.get(type(v), _deterministic_hash)
-    return hash_f(v)
+    # MRO walk: a base-class entry (e.g. BaseEstimator) covers subclasses.
+    table = settings.hash_by_type
+    for cls in type(v).__mro__:
+        hash_f = table.get(cls)
+        if hash_f is not None:
+            return hash_f(v)
+    return _deterministic_hash(v)
 
 
 def create_cache_key(**kwargs: dict[str, Any]) -> OrderedDict:
