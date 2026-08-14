@@ -23,11 +23,9 @@ def test_fitted_estimators_hash_by_fitted_state():
     result_a = predict(model_a)
     assert call_count == 1
 
-    # Different fit - must miss the cache and give the new fit's answer
-    result_b = predict(model_b)
+    result_b = predict(model_b)  # different fit: cache miss
     assert call_count == 2
     assert result_a != result_b
 
-    # Same fit again - cache hit
-    assert predict(model_a) == result_a
+    assert predict(model_a) == result_a  # same fit: cache hit
     assert call_count == 2

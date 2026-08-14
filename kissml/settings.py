@@ -38,9 +38,7 @@ def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
         import joblib
         from sklearn.base import BaseEstimator
 
-        # str(estimator) is the constructor repr (hyperparameters only),
-        # so differently-fitted models would collide. joblib.hash covers
-        # the full object graph, fitted attributes included.
+        # str(estimator) omits fitted state; joblib.hash covers it.
         rv[BaseEstimator] = joblib.hash
     except ImportError:
         pass

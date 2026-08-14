@@ -20,8 +20,7 @@ def _deterministic_hash(value: Any) -> str:
 
 
 def _hash_value(v: Any) -> str:
-    # Walk the MRO so entries registered for a base class (e.g.
-    # sklearn's BaseEstimator) apply to subclasses.
+    # MRO walk: a base-class entry (e.g. BaseEstimator) covers subclasses.
     table = settings.hash_by_type
     for cls in type(v).__mro__:
         hash_f = table.get(cls)
