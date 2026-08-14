@@ -166,6 +166,17 @@ def process() -> Annotated[pd.DataFrame, DatasetLogger(), HTMLVisualizer()]:
     return load_data()
 ```
 
+**Nested effects**: Effects can annotate element types inside containers (tuples, lists, dicts, sets — to any depth). A nested effect receives the matching element instead of the full return value:
+```python
+@step(cache=CacheConfig(version=1))
+def load_frames() -> tuple[
+    Annotated[pd.DataFrame, DatasetLogger()],  # receives element 0
+    list[Annotated[pd.DataFrame, HTMLVisualizer()]],  # each list element
+]:
+    return train_df, [fold_a, fold_b]
+```
+Effects run outer-first, left-to-right. Union arms (e.g. `Annotated[X, Eff()] | None`) and iterators/generators are not descended into, and dict effects apply to values, not keys.
+
 **Error Handling**: Control whether AfterEffect failures stop execution:
 ```python
 # Default: errors are logged but don't stop execution

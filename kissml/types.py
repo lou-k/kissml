@@ -102,7 +102,11 @@ class AfterEffect(ABC):
 
     Notes:
         - AfterEffects run on both cached and fresh results
-        - Multiple effects are executed left-to-right from the annotation
+        - Multiple effects are executed left-to-right from the annotation,
+          outer effects before nested ones
+        - Effects may be nested inside container annotations, e.g.
+          tuple[Annotated[pd.DataFrame, Logger()], str]; a nested effect
+          receives the matching element instead of the full return value
         - Effects should observe results, not transform them
         - The step decorator handles error handling based on configuration
     """
@@ -115,7 +119,9 @@ class AfterEffect(ABC):
         Execute this effect on the function result.
 
         Args:
-            result: The return value from the step function
+            result: The value this effect annotates: the step's return
+                value, or the matching element when the effect is nested
+                inside a container annotation
             was_cached: True if the result was loaded from cache, False if freshly computed
             func_name: The name of the step function that produced this result
             execution_time: Time in seconds taken to produce or load the result

@@ -284,8 +284,7 @@ def test_effect_nested_in_tuple_annotation_fires():
         return 1, "a"
 
     compute()
-    assert effect.call_count == 1
-    assert effect.calls[0]["result"] == 1
+    assert [c["result"] for c in effect.calls] == [1]
 
 
 def test_effects_fire_recursively_at_any_depth():
