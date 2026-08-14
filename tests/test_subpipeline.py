@@ -1,26 +1,9 @@
-import tempfile
-from pathlib import Path
 from typing import Annotated
 
 import pytest
 
-from kissml.core import close_all_caches
-from kissml.settings import settings
 from kissml.step import step, subpipeline
 from kissml.types import AfterEffect, CacheConfig, EvictionPolicy
-
-
-@pytest.fixture(autouse=True)
-def clean_cache():
-    """Clean up cache before and after each test."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        original_cache_dir = settings.cache_directory
-        settings.cache_directory = Path(tmpdir)
-
-        yield
-
-        close_all_caches()
-        settings.cache_directory = original_cache_dir
 
 
 class RecordingAfterEffect(AfterEffect):

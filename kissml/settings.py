@@ -34,6 +34,16 @@ def _default_hash_by_type() -> dict[type, Callable[[Any], str]]:
         rv[pd.Index] = lambda i: str(pd.util.hash_pandas_object(i))
     except ImportError:
         pass
+    try:
+        import joblib
+        from sklearn.base import BaseEstimator
+
+        # str(estimator) is the constructor repr (hyperparameters only),
+        # so differently-fitted models would collide. joblib.hash covers
+        # the full object graph, fitted attributes included.
+        rv[BaseEstimator] = joblib.hash
+    except ImportError:
+        pass
     return rv
 
 
@@ -64,12 +74,12 @@ class Settings(BaseSettings):
 
     hash_by_type: dict[type, Callable[[Any], str]] = Field(
         default_factory=_default_hash_by_type,
-        description="A mapping of python type -> custom hash function used to compute cache keys.",
+        description="A mapping of python type -> custom hash function used to compute cache keys. Matched by MRO, so an entry for a base class covers its subclasses.",
     )
 
     serialize_by_type: dict[type, Serializer] = Field(
         default_factory=_default_serializer_by_type,
-        description="A mapping of python type -> custom serializers to use for disk caching.",
+        description="A mapping of python type -> custom serializers to use for disk caching. Matched by exact type only, unlike hash_by_type.",
     )
 
     global_after_effects: list[AfterEffect] = Field(
