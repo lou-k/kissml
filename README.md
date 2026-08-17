@@ -254,34 +254,17 @@ prepare_data()
 
 ### Tags
 
-Tags are opaque key/value pairs (`str | int | float | bool` values) attached to a step and handed to its AfterEffects, so an effect can act on a subset of steps. Tags never affect the cache key.
-
-Declare them statically on the step, or ambiently for every step called within a block:
+Tags are opaque key/value pairs (`str | int | float | bool`) handed to a step's AfterEffects so an effect can act on a subset of steps. They never affect the cache key. Declare them on the step, or ambiently for every step called within a block:
 
 ```python
-import kissml
-from kissml import step, subpipeline
-
 @step(cache=CacheConfig(version=1), tags={"layer": 3})
 def telemetry_primary(): ...
 
-@subpipeline(tags={"lane": "telemetry"})
-def build_features(): ...
-
 with kissml.tags({"phase": "train"}):
-    build_features()  # every step beneath, at any depth, sees phase=train
+    telemetry_primary()  # effects see {"layer": 3, "phase": "train"}
 ```
 
-Effects receive the merged dict (`{}` when there are none): step tags win over ambient tags, and nested `with` blocks merge outward-in with the inner block winning. On a cache hit, effects see the tags in force *now*, not those in force when the value was computed.
-
-```python
-class GCSPersistEffect(AfterEffect):
-    def __call__(self, result, was_cached, func_name, execution_time, tags):
-        if tags.get("phase") == "train":
-            upload(result)
-```
-
-Ambient tags use `contextvars`, so they propagate into nested calls and asyncio tasks but **not** into `joblib`/`multiprocessing` workers -- a step running in a worker sees its decorator tags only.
+Step tags win over ambient tags; nested `with` blocks merge with the inner block winning. Effects always get a dict (`{}` if none), reflecting the tags in force at call time -- including on cache hits. Ambient tags use `contextvars`, so they reach nested calls and asyncio tasks but **not** `joblib`/`multiprocessing` workers.
 
 ### Configuration
 

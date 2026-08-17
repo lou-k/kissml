@@ -17,7 +17,7 @@ from typing import (
 
 from .core import create_cache_key, get_cache
 from .settings import settings
-from .tags import current_tags
+from .tags import _TAGS
 from .types import AfterEffect, CacheConfig, Tags
 
 P = ParamSpec("P")
@@ -106,10 +106,8 @@ def step(
             Different eviction policies can be configured per function.
         error_on_effect_failure: If True, AfterEffect failures raise exceptions.
             If False (default), AfterEffect errors are logged but don't stop execution.
-        tags: Optional key/value tags describing the step, passed to its
-            AfterEffects merged over any ambient ``kissml.tags(...)`` in
-            force at call time (step tags win). Tags never affect the
-            cache key.
+        tags: Tags passed to AfterEffects, merged over ambient ``kissml.tags``
+            (step wins). Never part of the cache key.
 
     Returns:
         Decorated function that logs execution time and caches results.
@@ -162,9 +160,7 @@ def step(
         >>> from kissml import step, AfterEffect, CacheConfig
         >>>
         >>> class HTMLVisualizer(AfterEffect):
-        ...     def __call__(
-        ...         self, result, was_cached, func_name, execution_time, tags
-        ...     ):
+        ...     def __call__(self, result, was_cached, func_name, execution_time, tags):
         ...         result.head(100).to_html(f"{func_name}.html")
         ...         mlflow.log_artifact(f"{func_name}.html")
         >>>
@@ -242,9 +238,8 @@ def step(
                         f"{func_typed.__name__} completed in {execution_time:.4f} seconds",
                     )
 
-            # Ambient tags are read at call time, so a cache hit sees the
-            # tags in force now, not those in force when it was computed
-            effect_tags = {**current_tags(), **step_tags}
+            # Read at call time: a cache hit sees the tags in force now
+            effect_tags = {**_TAGS.get(), **step_tags}
 
             def _run_effect(effect: AfterEffect, value: Any) -> None:
                 try:
@@ -320,7 +315,7 @@ def subpipeline(
         error_on_effect_failure: If True, AfterEffect failures raise exceptions.
             If False (default), AfterEffect errors are logged but don't stop
             execution.
-        tags: Optional key/value tags passed to AfterEffects; see ``step``.
+        tags: Tags passed to AfterEffects; see ``step``.
 
     Returns:
         Decorated function that always executes its body and runs any
@@ -341,9 +336,7 @@ def subpipeline(
         >>> from kissml import step, subpipeline, AfterEffect, CacheConfig
         >>>
         >>> class RowCountLogger(AfterEffect):
-        ...     def __call__(
-        ...         self, result, was_cached, func_name, execution_time, tags
-        ...     ):
+        ...     def __call__(self, result, was_cached, func_name, execution_time, tags):
         ...         print(f"{func_name}: {len(result)} rows")
         >>>
         >>> @step(cache=CacheConfig(version=1))
