@@ -1,10 +1,19 @@
 import inspect
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Iterator, Mapping
 from functools import wraps
+from itertools import repeat
 from types import FunctionType
-from typing import ParamSpec, TypeVar, cast, get_type_hints
+from typing import (
+    Any,
+    ParamSpec,
+    TypeVar,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from .core import create_cache_key, get_cache
 from .settings import settings
@@ -15,6 +24,55 @@ R = TypeVar("R")
 
 # Sentinel value to distinguish "not in cache" from "cached None"
 _CACHE_MISS = object()
+
+
+def _has_effects(annotation: Any) -> bool:
+    """True if an AfterEffect appears anywhere in the annotation tree.
+
+    Deliberately over-approximate: may return True for shapes
+    _iter_effects declines to descend into (e.g. union arms). Only used
+    to skip walking values that can never yield an effect.
+    """
+    metadata = getattr(annotation, "__metadata__", ())
+    if any(isinstance(meta, AfterEffect) for meta in metadata):
+        return True
+    return any(map(_has_effects, get_args(annotation)))
+
+
+def _iter_effects(
+    annotation: Any, value: Any
+) -> Iterator[tuple[AfterEffect, Any]]:
+    """Yield (effect, sub_value) for every AfterEffect in the annotation
+    tree, pairing each effect with the part of value it annotates.
+
+    Descends into container annotations (tuple, list, dict, set, ...)
+    when the runtime value is a matching Collection, so effects nested
+    at any depth fire against their corresponding element. Only
+    Collection annotations are entered, which excludes union arms,
+    iterators, and generators (iterating those would consume them).
+    Dict keys are not descended into, only values.
+    """
+    if hasattr(annotation, "__metadata__"):
+        for meta in annotation.__metadata__:
+            if isinstance(meta, AfterEffect):
+                yield meta, value
+        annotation = annotation.__origin__
+    origin, args = get_origin(annotation), get_args(annotation)
+    if not (
+        args
+        and isinstance(origin, type)
+        and issubclass(origin, Collection)
+        and isinstance(value, Collection)
+    ):
+        return
+    if isinstance(value, Mapping):
+        # Pair dict[K, V]'s value type with each mapping value
+        args, value = args[-1:], value.values()
+    if args[-1] is Ellipsis or len(args) == 1:
+        # Homogeneous container: one element type applies to every element
+        args = repeat(args[0])
+    for sub_annotation, sub_value in zip(args, value):
+        yield from _iter_effects(sub_annotation, sub_value)
 
 
 def step(
@@ -28,7 +86,10 @@ def step(
     This decorator provides the following features:
     1. Execution time tracking with configurable logging
     2. Persistent disk-based caching with version control
-    3. Executes any AfterEffects declared in the function's return type annotation
+    3. Executes any AfterEffects declared in the function's return type
+       annotation, including effects nested in container annotations
+       (e.g. on a tuple element's type), which receive the matching
+       element of the result rather than the full return value
 
     The decorator normalizes function arguments (positional and keyword) to ensure
     consistent cache keys regardless of how the function is called.
@@ -112,8 +173,9 @@ def step(
         # Get function signature once at decoration time
         sig = inspect.signature(func_typed)
 
-        # Cache type hints in closure to avoid repeated get_type_hints() calls
-        type_hints_cache: dict | None = None
+        # Return annotation, resolved lazily on first call; None when it
+        # declares no AfterEffects so later calls skip walking the result
+        return_annotation: Any = _CACHE_MISS
 
         @wraps(func_typed)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -171,43 +233,35 @@ def step(
                         f"{func_typed.__name__} completed in {execution_time:.4f} seconds",
                     )
 
-            def _run_effect(effect: AfterEffect) -> None:
-                if error_on_effect_failure:
+            def _run_effect(effect: AfterEffect, value: Any) -> None:
+                try:
                     effect(
-                        result,
+                        value,
                         was_cached,
                         func_typed.__name__,
                         execution_time,
                     )
-                else:
-                    try:
-                        effect(
-                            result,
-                            was_cached,
-                            func_typed.__name__,
-                            execution_time,
-                        )
-                    except Exception as e:
-                        logging.error(
-                            f"AfterEffect {effect.__class__.__name__} failed for {func_typed.__name__}: {e}"
-                        )
+                except Exception as e:
+                    if error_on_effect_failure:
+                        raise
+                    logging.error(
+                        f"AfterEffect {effect.__class__.__name__} failed for {func_typed.__name__}: {e}"
+                    )
 
             # Execute AfterEffects from type annotations
-            # Lazily resolve and cache type hints to avoid repeated work on each call
-            nonlocal type_hints_cache
-            if type_hints_cache is None:
-                type_hints_cache = get_type_hints(
-                    func_typed, include_extras=True
-                )
-            hints = type_hints_cache
-            if "return" in hints and hasattr(hints["return"], "__metadata__"):
-                # Process effects left-to-right
-                for effect in hints["return"].__metadata__:
-                    if isinstance(effect, AfterEffect):
-                        _run_effect(effect)
+            nonlocal return_annotation
+            if return_annotation is _CACHE_MISS:
+                hints = get_type_hints(func_typed, include_extras=True)
+                return_annotation = hints.get("return")
+                if not _has_effects(return_annotation):
+                    return_annotation = None
+            if return_annotation is not None:
+                # Outer effects run before nested ones, left-to-right
+                for effect, value in _iter_effects(return_annotation, result):
+                    _run_effect(effect, value)
 
             for effect in settings.global_after_effects:
-                _run_effect(effect)
+                _run_effect(effect, result)
 
             return result
 

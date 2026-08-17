@@ -273,3 +273,28 @@ def test_global_after_effect_error_handling(clean_global_effects):
         strict_compute(5)
     # Strict mode aborted before reaching follow_up
     assert follow_up.call_count == 1
+
+
+def test_effect_nested_in_tuple_annotation_fires():
+    """An effect annotated on a tuple element receives that element."""
+    effect = RecordingAfterEffect()
+
+    @step()
+    def compute() -> tuple[Annotated[int, effect], str]:
+        return 1, "a"
+
+    compute()
+    assert [c["result"] for c in effect.calls] == [1]
+
+
+def test_effects_fire_recursively_at_any_depth():
+    """Effects fire outer-first, each with its matching sub-value."""
+    outer, inner = RecordingAfterEffect(), RecordingAfterEffect()
+
+    @step()
+    def compute() -> Annotated[tuple[str, list[Annotated[int, inner]]], outer]:
+        return "a", [1, 2]
+
+    compute()
+    assert [c["result"] for c in outer.calls] == [("a", [1, 2])]
+    assert [c["result"] for c in inner.calls] == [1, 2]
