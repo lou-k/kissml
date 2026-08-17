@@ -89,6 +89,10 @@ Pre-commit hooks automatically run ruff-check, ruff-format, isort, and ty on com
 - `global_after_effects`: List of `AfterEffect` instances fired after every `@step` call, in addition to per-step effects declared via return annotations
 - Auto-registers pandas types if available
 
+**[kissml/tags.py](kissml/tags.py)** - Step tags
+- `tags()` context manager sets ambient tags in a `ContextVar` (merge on entry, reset by token on exit)
+- `@step`/`@subpipeline` accept `tags=`; effects receive `{**ambient, **step_tags}`. Tags never touch the cache key
+
 **[kissml/types.py](kissml/types.py)** - Type definitions
 - `EvictionPolicy` enum: NONE, LEAST_RECENTLY_STORED, LEAST_RECENTLY_USED, LEAST_FREQUENTLY_USED
 - `CacheConfig` Pydantic model: version + eviction_policy

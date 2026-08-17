@@ -2,51 +2,9 @@ from typing import Annotated
 
 import pytest
 
-from kissml.settings import settings
 from kissml.step import step
 from kissml.types import AfterEffect, CacheConfig, EvictionPolicy
-
-
-@pytest.fixture
-def clean_global_effects():
-    """Reset settings.global_after_effects before and after each test."""
-    original = list(settings.global_after_effects)
-    settings.global_after_effects.clear()
-    try:
-        yield settings.global_after_effects
-    finally:
-        settings.global_after_effects.clear()
-        settings.global_after_effects.extend(original)
-
-
-class RecordingAfterEffect(AfterEffect):
-    """AfterEffect that records when it's called."""
-
-    def __init__(self):
-        self.call_count = 0
-        self.calls = []
-
-    def __call__(
-        self, result, was_cached: bool, func_name: str, execution_time: float
-    ):
-        self.call_count += 1
-        self.calls.append(
-            {
-                "result": result,
-                "was_cached": was_cached,
-                "func_name": func_name,
-                "execution_time": execution_time,
-            }
-        )
-
-
-class FailingAfterEffect(AfterEffect):
-    """AfterEffect that always raises an exception."""
-
-    def __call__(
-        self, result, was_cached: bool, func_name: str, execution_time: float
-    ):
-        raise ValueError("AfterEffect intentionally failed")
+from tests.conftest import FailingAfterEffect, RecordingAfterEffect
 
 
 class OrderTrackingEffect(AfterEffect):
@@ -57,7 +15,12 @@ class OrderTrackingEffect(AfterEffect):
         self.call_order = call_order
 
     def __call__(
-        self, result, was_cached: bool, func_name: str, execution_time: float
+        self,
+        result,
+        was_cached: bool,
+        func_name: str,
+        execution_time: float,
+        tags,
     ):
         self.call_order.append(self.label)
 

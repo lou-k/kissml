@@ -139,7 +139,7 @@ class HTMLVisualizer(AfterEffect):
     def __init__(self, max_rows=100):
         self.max_rows = max_rows
     
-    def __call__(self, result, was_cached, func_name, execution_time):
+    def __call__(self, result, was_cached, func_name, execution_time, tags):
         # Create HTML preview
         html = result.head(self.max_rows).to_html()
         html = f"<h3>{func_name} - {execution_time:.2f}s {'(cached)' if was_cached else ''}</h3>" + html
@@ -156,7 +156,7 @@ def load_data() -> Annotated[pd.DataFrame, HTMLVisualizer(max_rows=200)]:
 
 # Multiple effects run left-to-right
 class DatasetLogger(AfterEffect):
-    def __call__(self, result, was_cached, func_name, execution_time):
+    def __call__(self, result, was_cached, func_name, execution_time, tags):
         if not was_cached:  # Only log once
             mlflow.log_metric(f"{func_name}_rows", len(result))
 
@@ -199,7 +199,7 @@ from kissml import settings, step, AfterEffect
 class StepTimingLogger(AfterEffect):
     """Log every step's name, runtime, and cache status."""
 
-    def __call__(self, result, was_cached, func_name, execution_time):
+    def __call__(self, result, was_cached, func_name, execution_time, tags):
         status = "cached" if was_cached else "fresh"
         logging.info(
             f"{func_name} finished in {execution_time:.3f}s ({status})"
@@ -230,7 +230,7 @@ from typing import Annotated
 from kissml import step, subpipeline, AfterEffect, CacheConfig
 
 class RowCountLogger(AfterEffect):
-    def __call__(self, result, was_cached, func_name, execution_time):
+    def __call__(self, result, was_cached, func_name, execution_time, tags):
         print(f"{func_name}: {len(result)} rows")
 
 @step(cache=CacheConfig(version=1))
@@ -251,6 +251,37 @@ prepare_data()
 ```
 
 `subpipeline()` has no `cache` parameter (caching is deliberately unsupported) but accepts the same `log_level` and `error_on_effect_failure` options as `step()`. Both decorators stamp `__kissml_kind__` on the wrapped function (`"step"` or `"subpipeline"`) so tooling can classify decorated functions by introspection.
+
+### Tags
+
+Tags are opaque key/value pairs (`str | int | float | bool` values) attached to a step and handed to its AfterEffects, so an effect can act on a subset of steps. Tags never affect the cache key.
+
+Declare them statically on the step, or ambiently for every step called within a block:
+
+```python
+import kissml
+from kissml import step, subpipeline
+
+@step(cache=CacheConfig(version=1), tags={"layer": 3})
+def telemetry_primary(): ...
+
+@subpipeline(tags={"lane": "telemetry"})
+def build_features(): ...
+
+with kissml.tags({"phase": "train"}):
+    build_features()  # every step beneath, at any depth, sees phase=train
+```
+
+Effects receive the merged dict (`{}` when there are none): step tags win over ambient tags, and nested `with` blocks merge outward-in with the inner block winning. On a cache hit, effects see the tags in force *now*, not those in force when the value was computed.
+
+```python
+class GCSPersistEffect(AfterEffect):
+    def __call__(self, result, was_cached, func_name, execution_time, tags):
+        if tags.get("phase") == "train":
+            upload(result)
+```
+
+Ambient tags use `contextvars`, so they propagate into nested calls and asyncio tasks but **not** into `joblib`/`multiprocessing` workers -- a step running in a worker sees its decorator tags only.
 
 ### Configuration
 

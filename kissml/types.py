@@ -1,8 +1,12 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from enum import Enum
 from typing import Any, BinaryIO
 
 from pydantic import BaseModel, Field
+
+TagValue = str | int | float | bool
+Tags = Mapping[str, TagValue]
 
 
 class EvictionPolicy(Enum):
@@ -90,7 +94,9 @@ class AfterEffect(ABC):
         >>> from kissml import step, AfterEffect, CacheConfig
         >>>
         >>> class DataFrameLogger(AfterEffect):
-        ...     def __call__(self, result, was_cached, func_name, execution_time):
+        ...     def __call__(
+        ...         self, result, was_cached, func_name, execution_time, tags
+        ...     ):
         ...         logging.info(f"{func_name}: {len(result)} rows, cached={was_cached}")
         >>>
         >>> @step(cache=CacheConfig(version=1))
@@ -113,7 +119,12 @@ class AfterEffect(ABC):
 
     @abstractmethod
     def __call__(
-        self, result, was_cached: bool, func_name: str, execution_time: float
+        self,
+        result,
+        was_cached: bool,
+        func_name: str,
+        execution_time: float,
+        tags: dict[str, TagValue],
     ):
         """
         Execute this effect on the function result.
@@ -125,5 +136,8 @@ class AfterEffect(ABC):
             was_cached: True if the result was loaded from cache, False if freshly computed
             func_name: The name of the step function that produced this result
             execution_time: Time in seconds taken to produce or load the result
+            tags: The step's ``tags=`` merged over the ambient
+                ``kissml.tags(...)`` in force at call time (step tags win).
+                ``{}`` when there are none.
         """
         pass

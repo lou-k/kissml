@@ -3,28 +3,8 @@ from typing import Annotated
 import pytest
 
 from kissml.step import step, subpipeline
-from kissml.types import AfterEffect, CacheConfig, EvictionPolicy
-
-
-class RecordingAfterEffect(AfterEffect):
-    """AfterEffect that records how many times it's called."""
-
-    def __init__(self):
-        self.call_count = 0
-
-    def __call__(
-        self, result, was_cached: bool, func_name: str, execution_time: float
-    ):
-        self.call_count += 1
-
-
-class FailingAfterEffect(AfterEffect):
-    """AfterEffect that always raises an exception."""
-
-    def __call__(
-        self, result, was_cached: bool, func_name: str, execution_time: float
-    ):
-        raise ValueError("AfterEffect intentionally failed")
+from kissml.types import CacheConfig, EvictionPolicy
+from tests.conftest import FailingAfterEffect, RecordingAfterEffect
 
 
 def test_subpipeline_body_runs_every_call_even_with_cached_inner_step():
