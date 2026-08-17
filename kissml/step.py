@@ -17,7 +17,8 @@ from typing import (
 
 from .core import create_cache_key, get_cache
 from .settings import settings
-from .types import AfterEffect, CacheConfig
+from .tags import _TAGS
+from .types import AfterEffect, CacheConfig, Tags
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -79,6 +80,7 @@ def step(
     log_level: int | None = None,
     cache: CacheConfig | None = None,
     error_on_effect_failure: bool = False,
+    tags: Tags | None = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator for machine learning pipeline steps.
@@ -104,6 +106,8 @@ def step(
             Different eviction policies can be configured per function.
         error_on_effect_failure: If True, AfterEffect failures raise exceptions.
             If False (default), AfterEffect errors are logged but don't stop execution.
+        tags: Tags passed to AfterEffects, merged over ambient ``kissml.tags``
+            (step wins). Never part of the cache key.
 
     Returns:
         Decorated function that logs execution time and caches results.
@@ -156,7 +160,7 @@ def step(
         >>> from kissml import step, AfterEffect, CacheConfig
         >>>
         >>> class HTMLVisualizer(AfterEffect):
-        ...     def __call__(self, result, was_cached, func_name, execution_time):
+        ...     def __call__(self, result, was_cached, func_name, execution_time, tags):
         ...         result.head(100).to_html(f"{func_name}.html")
         ...         mlflow.log_artifact(f"{func_name}.html")
         >>>
@@ -176,6 +180,7 @@ def step(
         # Return annotation, resolved lazily on first call; None when it
         # declares no AfterEffects so later calls skip walking the result
         return_annotation: Any = _CACHE_MISS
+        step_tags = tags or {}
 
         @wraps(func_typed)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -233,6 +238,9 @@ def step(
                         f"{func_typed.__name__} completed in {execution_time:.4f} seconds",
                     )
 
+            # Read at call time: a cache hit sees the tags in force now
+            effect_tags = {**_TAGS.get(), **step_tags}
+
             def _run_effect(effect: AfterEffect, value: Any) -> None:
                 try:
                     effect(
@@ -240,6 +248,7 @@ def step(
                         was_cached,
                         func_typed.__name__,
                         execution_time,
+                        effect_tags,
                     )
                 except Exception as e:
                     if error_on_effect_failure:
@@ -275,6 +284,7 @@ def step(
 def subpipeline(
     log_level: int | None = None,
     error_on_effect_failure: bool = False,
+    tags: Tags | None = None,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator for composing steps into an uncached pipeline.
@@ -305,6 +315,7 @@ def subpipeline(
         error_on_effect_failure: If True, AfterEffect failures raise exceptions.
             If False (default), AfterEffect errors are logged but don't stop
             execution.
+        tags: Tags passed to AfterEffects; see ``step``.
 
     Returns:
         Decorated function that always executes its body and runs any
@@ -325,7 +336,7 @@ def subpipeline(
         >>> from kissml import step, subpipeline, AfterEffect, CacheConfig
         >>>
         >>> class RowCountLogger(AfterEffect):
-        ...     def __call__(self, result, was_cached, func_name, execution_time):
+        ...     def __call__(self, result, was_cached, func_name, execution_time, tags):
         ...         print(f"{func_name}: {len(result)} rows")
         >>>
         >>> @step(cache=CacheConfig(version=1))
@@ -347,6 +358,7 @@ def subpipeline(
         log_level=log_level,
         cache=None,  # Subpipelines do not support caching
         error_on_effect_failure=error_on_effect_failure,
+        tags=tags,
     )
 
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
