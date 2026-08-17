@@ -3,6 +3,7 @@ import logging
 import time
 from collections.abc import Callable, Collection, Iterator, Mapping
 from functools import wraps
+from itertools import repeat
 from types import FunctionType
 from typing import (
     Any,
@@ -56,31 +57,20 @@ def _iter_effects(
             if isinstance(meta, AfterEffect):
                 yield meta, value
         annotation = annotation.__origin__
-    origin = get_origin(annotation)
-    args = get_args(annotation)
-    if (
-        not args
-        or not (isinstance(origin, type) and issubclass(origin, Collection))
-        or not isinstance(value, Collection)
-        # A mistyped str/bytes value would otherwise fan out per character
-        or isinstance(value, (str, bytes))
+    origin, args = get_origin(annotation), get_args(annotation)
+    if not (
+        args
+        and isinstance(origin, type)
+        and issubclass(origin, Collection)
+        and isinstance(value, Collection)
     ):
         return
     if isinstance(value, Mapping):
         # Pair dict[K, V]'s value type with each mapping value
         args, value = args[-1:], value.values()
-    if not any(map(_has_effects, args)):
-        # Skip walking large containers whose elements declare no effects
-        return
     if args[-1] is Ellipsis or len(args) == 1:
         # Homogeneous container: one element type applies to every element
-        args = args[:1] * len(value)
-    if len(args) != len(value):
-        logging.warning(
-            f"AfterEffects skipped: {annotation} declares {len(args)} "
-            f"elements but the value has {len(value)}"
-        )
-        return
+        args = repeat(args[0])
     for sub_annotation, sub_value in zip(args, value):
         yield from _iter_effects(sub_annotation, sub_value)
 
