@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from kissml.serializers import PandasSerializer
 from kissml.step import step
 from kissml.types import CacheConfig
 
@@ -343,8 +344,6 @@ def test_dataframe_with_ndarray_column_and_nones():
     import numpy as np
     import pandas as pd
 
-    from kissml.serializers import PandasSerializer
-
     df = pd.DataFrame(
         {
             "id": [1, 2, 3, 4],
@@ -378,3 +377,27 @@ def test_dataframe_with_ndarray_column_and_nones():
             np.testing.assert_array_equal(
                 result["matrix"].iloc[i], df["matrix"].iloc[i]
             )
+
+
+def test_to_packed_dataframe_without_ndarray_columns_returns_same_frame():
+    df = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "obj": pd.Series([{"k": 1}, None], dtype=object),
+        }
+    )
+
+    packed, columns = PandasSerializer().to_packed_dataframe(df)
+
+    assert packed is df
+    assert columns == []
+
+
+def test_to_packed_dataframe_with_ndarray_column_does_not_mutate_input():
+    df = pd.DataFrame({"m": [np.zeros(2), None]})
+
+    packed, columns = PandasSerializer().to_packed_dataframe(df)
+
+    assert packed is not df
+    assert columns == ["m"]
+    assert isinstance(df["m"].iloc[0], np.ndarray)
