@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 
-from kissml.serializers import PandasSerializer
 from kissml.step import step
 from kissml.types import CacheConfig
 
@@ -344,6 +343,8 @@ def test_dataframe_with_ndarray_column_and_nones():
     import numpy as np
     import pandas as pd
 
+    from kissml.serializers import PandasSerializer
+
     df = pd.DataFrame(
         {
             "id": [1, 2, 3, 4],
@@ -380,6 +381,8 @@ def test_dataframe_with_ndarray_column_and_nones():
 
 
 def test_to_packed_dataframe_without_ndarray_columns_returns_same_frame():
+    from kissml.serializers import PandasSerializer
+
     df = pd.DataFrame(
         {
             "id": [1, 2],
@@ -394,6 +397,8 @@ def test_to_packed_dataframe_without_ndarray_columns_returns_same_frame():
 
 
 def test_to_packed_dataframe_with_ndarray_column_does_not_mutate_input():
+    from kissml.serializers import PandasSerializer
+
     df = pd.DataFrame({"m": [np.zeros(2), None]})
 
     packed, columns = PandasSerializer().to_packed_dataframe(df)
