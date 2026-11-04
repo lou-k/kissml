@@ -60,6 +60,8 @@ class PandasSerializer(Serializer):
     def to_packed_dataframe(self, df):
         """
         Convert a DataFrame with ndarray columns to a packed format suitable for Parquet storage.
+
+        The frame comes back as is when no column needs packing.
         """
         import pandas as pd
 
@@ -71,8 +73,11 @@ class PandasSerializer(Serializer):
         columns_with_ndarrays = [
             col
             for col in df.columns
-            if any(isinstance(item, np.ndarray) for item in df[col])
+            if df[col].dtype == object
+            and any(isinstance(item, np.ndarray) for item in df[col])
         ]
+        if not columns_with_ndarrays:
+            return df, []
 
         # Create a copy to avoid modifying the original
         df = df.copy()
