@@ -460,6 +460,7 @@ _MIXED = pd.DataFrame(
             }
         ),
         pd.DataFrame({"o": [1, None, 3, 4, 5]}, dtype=object),
+        _MIXED.set_index(["c", "i"]),
         _MIXED.iloc[:0],
         _MIXED.iloc[:1],
     ],
@@ -478,6 +479,7 @@ _MIXED = pd.DataFrame(
         "string_pyarrow",
         "datetime_timedelta_period_interval_bytes",
         "object_ints_with_none",
+        "nullable_int_index_level_with_none",
         "empty",
         "one_row",
     ],

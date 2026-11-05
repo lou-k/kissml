@@ -1,12 +1,9 @@
 import json
 import pickle
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, BinaryIO
+from typing import Any, BinaryIO
 
 import numpy as np
-
-if TYPE_CHECKING:
-    pass
 
 from kissml.types import Serializer
 
