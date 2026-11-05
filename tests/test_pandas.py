@@ -1,6 +1,11 @@
+from io import BytesIO
+
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
+import pytest
 
+from kissml.serializers import PandasSerializer
 from kissml.step import step
 from kissml.types import CacheConfig
 
@@ -406,3 +411,73 @@ def test_to_packed_dataframe_with_ndarray_column_does_not_mutate_input():
     assert packed is not df
     assert columns == ["m"]
     assert isinstance(df["m"].iloc[0], np.ndarray)
+
+
+def _serialize(df, row_group_size=None):
+    """Serialize ``df``, then rewrite the Parquet file in row groups."""
+    buffer = BytesIO()
+    PandasSerializer().serialize(df, buffer)
+    buffer.seek(0)
+    table = pq.read_table(buffer)
+    buffer = BytesIO()
+    pq.write_table(table, buffer, row_group_size=row_group_size)
+    buffer.seek(0)
+    return buffer
+
+
+_MIXED = pd.DataFrame(
+    {
+        "f": [0.5, np.nan, 2.5, 3.5, 4.5],
+        "i": pd.array([1, None, 3, 4, 5], dtype="Int64"),
+        "b": pd.array([True, None, False, True, None], dtype="boolean"),
+        "c": pd.Categorical(list("zzyxz"), categories=list("zyx")),
+        "t": pd.date_range("2026-01-01", periods=5, tz="UTC"),
+        "s": ["a", None, "c", None, "e"],
+    }
+)
+
+
+@pytest.mark.parametrize(
+    "df",
+    [
+        _MIXED,
+        _MIXED.set_axis(pd.RangeIndex(10, 20, 2, name="r")),
+        _MIXED.set_index("t"),
+        _MIXED.set_index("s"),
+        _MIXED.set_index(["s", "i"]),
+        _MIXED.iloc[:0],
+        _MIXED.iloc[:1],
+    ],
+    ids=["range", "named_range", "datetime", "named", "multi", "empty", "one"],
+)
+def test_deserialize_row_groups_matches_whole_table_read(df):
+    buffer = _serialize(df, row_group_size=2)
+    expected = pq.read_table(buffer).to_pandas()
+    buffer.seek(0)
+
+    pd.testing.assert_frame_equal(
+        PandasSerializer().deserialize(buffer),
+        expected,
+        check_index_type=True,
+    )
+
+
+def test_deserialize_row_groups_unpacks_ndarray_columns():
+    df = pd.DataFrame({"m": [np.eye(2), None, np.ones(3)]})
+
+    result = PandasSerializer().deserialize(_serialize(df, row_group_size=2))
+
+    assert result["m"].iloc[1] is None
+    np.testing.assert_array_equal(result["m"].iloc[0], np.eye(2))
+    np.testing.assert_array_equal(result["m"].iloc[2], np.ones(3))
+
+
+def test_deserialize_row_groups_never_reads_whole_table(monkeypatch):
+    buffer = _serialize(_MIXED, row_group_size=2)
+
+    def read_table(*args, **kwargs):
+        raise AssertionError("read the whole table")
+
+    monkeypatch.setattr(pq, "read_table", read_table)
+
+    assert len(PandasSerializer().deserialize(buffer)) == len(_MIXED)
