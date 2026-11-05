@@ -444,11 +444,25 @@ _MIXED = pd.DataFrame(
         _MIXED.set_axis(pd.RangeIndex(10, 20, 2, name="r")),
         _MIXED.set_index("t"),
         _MIXED.set_index("s"),
+        _MIXED.set_index("s")[[]],
         _MIXED.set_index(["s", "i"]),
+        _MIXED.set_index("c"),
+        _MIXED.astype({"c": pd.CategoricalDtype(list("zyx"), ordered=True)}),
         _MIXED.iloc[:0],
         _MIXED.iloc[:1],
     ],
-    ids=["range", "named_range", "datetime", "named", "multi", "empty", "one"],
+    ids=[
+        "range",
+        "named_range",
+        "datetime",
+        "named",
+        "index_only",
+        "multi",
+        "categorical_index",
+        "ordered",
+        "empty",
+        "one",
+    ],
 )
 def test_deserialize_row_groups_matches_whole_table_read(df):
     buffer = _serialize(df, row_group_size=2)
@@ -475,9 +489,9 @@ def test_deserialize_row_groups_unpacks_ndarray_columns():
 def test_deserialize_row_groups_never_reads_whole_table(monkeypatch):
     buffer = _serialize(_MIXED, row_group_size=2)
 
-    def read_table(*args, **kwargs):
+    def read(*args, **kwargs):
         raise AssertionError("read the whole table")
 
-    monkeypatch.setattr(pq, "read_table", read_table)
+    monkeypatch.setattr(pq, "read_table", read)
 
     assert len(PandasSerializer().deserialize(buffer)) == len(_MIXED)

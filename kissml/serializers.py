@@ -134,10 +134,10 @@ class PandasSerializer(Serializer):
         """
         Read the file one row group at a time into one preallocated frame.
 
-        Peak memory is the frame plus one row group. Returns None for a file
-        whose frame a per-row-group read cannot rebuild exactly: no rows, no
-        pandas metadata, a MultiIndex, a categorical index, an ordered
-        categorical column, or row groups whose columns or dtypes differ.
+        Returns None for a file whose frame a per-row-group read cannot
+        rebuild exactly: no rows, no pandas metadata, a MultiIndex, a
+        categorical index, an ordered categorical column, or row groups whose
+        columns or dtypes differ.
         """
         import pandas as pd
         from pandas.api.types import union_categoricals
@@ -150,9 +150,9 @@ class PandasSerializer(Serializer):
         if len(index_columns) > 1:
             return None
 
-        first = parquet.read_row_group(0).to_pandas()
-        dtypes = list(first.dtypes)
-        if isinstance(first.index, pd.CategoricalIndex) or any(
+        template = parquet.schema_arrow.empty_table().to_pandas()
+        dtypes = list(template.dtypes)
+        if isinstance(template.index, pd.CategoricalIndex) or any(
             isinstance(d, pd.CategoricalDtype) and d.ordered for d in dtypes
         ):
             return None
@@ -162,7 +162,8 @@ class PandasSerializer(Serializer):
             {j: _empty_array(d, num_rows) for j, d in enumerate(dtypes)},
             copy=False,
         )
-        out.columns = first.columns
+        # Keeps the column Index's name and type, which integer keys lose.
+        out.columns = template.columns
         # Each row group has its own dictionary, so categoricals are joined
         # after the fill, in first-seen category order.
         categoricals = {
@@ -170,42 +171,40 @@ class PandasSerializer(Serializer):
             for j, d in enumerate(dtypes)
             if isinstance(d, pd.CategoricalDtype)
         }
+        filled = [j for j in range(len(dtypes)) if j not in categoricals]
+        index = index_columns[0] if index_columns else None
         index_parts = []
         start = 0
         for i in range(parquet.num_row_groups):
-            chunk = first if i == 0 else parquet.read_row_group(i).to_pandas()
-            first = None
+            chunk = parquet.read_row_group(i).to_pandas()
             if not chunk.columns.equals(out.columns) or not all(
                 _same_dtype(a, b) for a, b in zip(chunk.dtypes, dtypes)
             ):
                 return None
             stop = start + len(chunk)
-            for j in range(len(dtypes)):
-                values = chunk.iloc[:, j].array
-                if j in categoricals:
-                    categoricals[j].append(values)
-                else:
-                    out.iloc[start:stop, j] = values
-            index_parts.append(chunk.index)
+            for j in filled:
+                out.iloc[start:stop, j] = chunk.iloc[:, j].array
+            for j, parts in categoricals.items():
+                parts.append(chunk.iloc[:, j].array)
+            if isinstance(index, str):
+                index_parts.append(chunk.index)
             start = stop
-            del chunk, values
+            # Frees this row group before the next one is read.
+            del chunk
         for j, parts in categoricals.items():
             out.isetitem(j, union_categoricals(parts))
 
-        index = index_columns[0] if index_columns else None
         if isinstance(index, str):
             out.index = index_parts[0].append(index_parts[1:])
-        elif (
-            index
-            and len(range(index["start"], index["stop"], index["step"]))
-            == num_rows
-        ):
-            out.index = pd.RangeIndex(
+        elif index:
+            range_index = pd.RangeIndex(
                 index["start"],
                 index["stop"],
                 index["step"],
                 name=index["name"],
             )
+            if len(range_index) == num_rows:
+                out.index = range_index
         return out
 
 
@@ -217,7 +216,8 @@ def _empty_array(dtype: Any, length: int) -> Any:
 
 
 def _same_dtype(actual: Any, expected: Any) -> bool:
-    """Return whether a row group's dtype matches the frame's target dtype.
+    """
+    Return whether a row group's dtype matches the frame's target dtype.
 
     Categoricals match on kind alone, since each row group has its own
     categories.
