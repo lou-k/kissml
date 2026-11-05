@@ -1,12 +1,9 @@
 import json
 import pickle
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, BinaryIO
+from typing import Any, BinaryIO
 
 import numpy as np
-
-if TYPE_CHECKING:
-    pass
 
 from kissml.types import Serializer
 
@@ -105,14 +102,14 @@ class PandasSerializer(Serializer):
     def deserialize(self, input: BinaryIO) -> Any:
         import pyarrow.parquet as pq
 
-        table = pq.read_table(input)
-        df = table.to_pandas()
+        from kissml._pandas_parquet import read_dataframe
+
+        parquet = pq.ParquetFile(input)
+        df = read_dataframe(parquet)
 
         # Read metadata to determine which columns to convert back
-        metadata_bytes = (
-            table.schema.metadata.get(b"serializer_metadata")
-            if table.schema.metadata
-            else None
+        metadata_bytes = (parquet.schema_arrow.metadata or {}).get(
+            b"serializer_metadata"
         )
         if metadata_bytes:
             metadata = json.loads(metadata_bytes.decode())
