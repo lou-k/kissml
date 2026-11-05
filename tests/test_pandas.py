@@ -386,8 +386,6 @@ def test_dataframe_with_ndarray_column_and_nones():
 
 
 def test_to_packed_dataframe_without_ndarray_columns_returns_same_frame():
-    from kissml.serializers import PandasSerializer
-
     df = pd.DataFrame(
         {
             "id": [1, 2],
@@ -402,8 +400,6 @@ def test_to_packed_dataframe_without_ndarray_columns_returns_same_frame():
 
 
 def test_to_packed_dataframe_with_ndarray_column_does_not_mutate_input():
-    from kissml.serializers import PandasSerializer
-
     df = pd.DataFrame({"m": [np.zeros(2), None]})
 
     packed, columns = PandasSerializer().to_packed_dataframe(df)
@@ -413,8 +409,8 @@ def test_to_packed_dataframe_with_ndarray_column_does_not_mutate_input():
     assert isinstance(df["m"].iloc[0], np.ndarray)
 
 
-def _serialize(df, row_group_size=None):
-    """Serialize ``df``, then rewrite the Parquet file in row groups."""
+def _serialize(df, row_group_size=2):
+    """Serialize ``df``, then rewrite the Parquet file in small row groups."""
     buffer = BytesIO()
     PandasSerializer().serialize(df, buffer)
     buffer.seek(0)
@@ -430,8 +426,8 @@ _MIXED = pd.DataFrame(
         "f": [0.5, np.nan, 2.5, 3.5, 4.5],
         "i": pd.array([1, None, 3, 4, 5], dtype="Int64"),
         "b": pd.array([True, None, False, True, None], dtype="boolean"),
-        "c": pd.Categorical(list("zzyxz"), categories=list("zyx")),
-        "t": pd.date_range("2026-01-01", periods=5, tz="UTC"),
+        "c": pd.Categorical(list("zzyxz"), categories=list("xyz")),
+        "t": pd.date_range("2026-01-01", periods=5, tz="US/Eastern"),
         "s": ["a", None, "c", None, "e"],
     }
 )
@@ -442,30 +438,52 @@ _MIXED = pd.DataFrame(
     [
         _MIXED,
         _MIXED.set_axis(pd.RangeIndex(10, 20, 2, name="r")),
-        _MIXED.set_index("t"),
         _MIXED.set_index("s"),
-        _MIXED.set_index("s")[[]],
-        _MIXED.set_index(["s", "i"]),
+        _MIXED.set_axis(pd.Index([5, 3, 1, 9, 7])),
+        _MIXED.set_index("t"),
+        _MIXED.set_index(["c", "s"]),
         _MIXED.set_index("c"),
-        _MIXED.astype({"c": pd.CategoricalDtype(list("zyx"), ordered=True)}),
+        _MIXED.set_index("s")[[]],
+        _MIXED.set_axis(range(6), axis=1),
+        _MIXED.set_axis(
+            pd.MultiIndex.from_product([["a"], _MIXED.columns]), axis=1
+        ),
+        _MIXED.astype({"c": pd.CategoricalDtype(list("xyz"), ordered=True)}),
+        _MIXED.astype({"s": "string[pyarrow]"}),
+        pd.DataFrame(
+            {
+                "d": pd.date_range("2026-01-01", periods=5),
+                "td": pd.to_timedelta(range(5), "s"),
+                "p": pd.period_range("2026-01", periods=5, freq="M"),
+                "v": pd.interval_range(0, 5),
+                "y": [b"a", None, b"c", b"d", b"e"],
+            }
+        ),
+        pd.DataFrame({"o": [1, None, 3, 4, 5]}, dtype=object),
         _MIXED.iloc[:0],
         _MIXED.iloc[:1],
     ],
     ids=[
         "range",
-        "named_range",
-        "datetime",
-        "named",
-        "index_only",
-        "multi",
+        "named_stepped_range",
+        "object_index",
+        "unnamed_int_index",
+        "datetime_tz_index",
+        "multi_index_with_categorical_level",
         "categorical_index",
-        "ordered",
+        "index_only",
+        "int_column_names",
+        "multi_index_columns",
+        "ordered_categorical",
+        "string_pyarrow",
+        "datetime_timedelta_period_interval_bytes",
+        "object_ints_with_none",
         "empty",
-        "one",
+        "one_row",
     ],
 )
 def test_deserialize_row_groups_matches_whole_table_read(df):
-    buffer = _serialize(df, row_group_size=2)
+    buffer = _serialize(df)
     expected = pq.read_table(buffer).to_pandas()
     buffer.seek(0)
 
@@ -479,7 +497,7 @@ def test_deserialize_row_groups_matches_whole_table_read(df):
 def test_deserialize_row_groups_unpacks_ndarray_columns():
     df = pd.DataFrame({"m": [np.eye(2), None, np.ones(3)]})
 
-    result = PandasSerializer().deserialize(_serialize(df, row_group_size=2))
+    result = PandasSerializer().deserialize(_serialize(df))
 
     assert result["m"].iloc[1] is None
     np.testing.assert_array_equal(result["m"].iloc[0], np.eye(2))
@@ -487,11 +505,11 @@ def test_deserialize_row_groups_unpacks_ndarray_columns():
 
 
 def test_deserialize_row_groups_never_reads_whole_table(monkeypatch):
-    buffer = _serialize(_MIXED, row_group_size=2)
+    buffer = _serialize(_MIXED.set_index(["c", "s"]))
 
     def read(*args, **kwargs):
         raise AssertionError("read the whole table")
 
-    monkeypatch.setattr(pq, "read_table", read)
+    monkeypatch.setattr(pq.ParquetFile, "read", read)
 
     assert len(PandasSerializer().deserialize(buffer)) == len(_MIXED)
